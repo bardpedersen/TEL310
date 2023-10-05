@@ -1,6 +1,7 @@
 #!/usr/bin/env python3 
 """
 Porblems when alpha values are too small
+alpha = [0.001, 0.001, 0.001, 0.001, 0.001, 0.001]
 """
 import math
 import random
@@ -215,7 +216,6 @@ if __name__ == '__main__':
     t = 2 # Time step
     test_ut = [1, math.pi/8] # Control input
     alpha = [0.15, 0.15, 0.15, 0.15, 0.15, 0.15] # Motion error parameters
-    alpha = [0.001, 0.001, 0.001, 0.001, 0.001, 0.001] # Motion error parameters
     print(motion_model_velocity(test_xt, test_ut, test_xt_1, t, alpha[0], alpha[1], alpha[2], alpha[3], alpha[4], alpha[5]))
 
     # Testing the sample model with velocity
