@@ -11,12 +11,12 @@ def prob_normal_distribution(a, b, c_2):
 
 """
 """
-def p_hit(ztk, zmax, ztk_star, sigma_hit):
+def p_hit(ztk, ztk_star, zmax, sigma_hit):
     if 0 <= ztk <= zmax:
         N = prob_normal_distribution(ztk, ztk_star, sigma_hit)
-        cdf = (stats.norm.cdf([0, zmax], loc=ztk_star, scale=sigma_hit))**(-1)
+        cdf = (stats.norm.cdf([0, zmax], loc=ztk_star, scale=sigma_hit))
         cdf = cdf[1] - cdf[0]
-        return cdf * N 
+        return cdf**(-1) * N 
     else:
         return 0
 
@@ -44,27 +44,41 @@ def p_rand(ztk, zmax):
         return 1/zmax
     else:
         return 0
+    
+"""
+"""
+def ray_casting(ztk, xt, m):
+    a = ztk + xt + m
+    return None
+
 
 """
 zt = range scan in the range of [0;zmax]
 xt = robot pose
 m = map
-
-def beam_range_finder_model(zt, xt, m): 
+"""
+def beam_range_finder_model(zt, xt, m, Theta): 
     q = 1.0
+    z_hit   = Theta(1)
+    z_short = Theta(2)
+    z_max   = Theta(3)
+    z_rand  = Theta(4)
+    sigma_hit = Theta(5)
+    lambda_short = Theta(6)
+
     for k in range(len(zt)):
+        ztk = zt[k]
         # Compute the expected measurement for the current pose and map
-        zt_star = ray_casting(zt[k], xt, m)
+        ztk_star = ray_casting(ztk, xt, m)
         
         # Compute the probability of the actual measurement given the expected measurement
-        p_hit = p_hit(zt[k], zt_star)
-        p_short = p_short(zt[k], zt_star)
-        p_max = p_max(zt[k], zt_star)
-        p_rand = p_rand(zt[k], zt_star)
+        p_hit = p_hit(ztk, ztk_star, z_max, sigma_hit)
+        p_short = p_short(ztk, ztk_star, lambda_short)
+        p_max = p_max(ztk, z_max)
+        p_rand = p_rand(ztk, z_max)
         p = z_hit * p_hit + z_short * p_short + z_max * p_max + z_rand * p_rand
         
         # Update the total probability
         q *= p
     
     return q
-""" 

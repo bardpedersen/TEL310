@@ -22,7 +22,7 @@ def test_p_max():
     print(sensor_model.p_max(ztk, zmax))
 
 def test_p_rand():
-    ztk = 1
+    ztk = 10
     zmax = 10
     print(sensor_model.p_rand(ztk, zmax))
 
