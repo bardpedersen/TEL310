@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import skimage.morphology as mp
 
 # Load the image
-image = Image.open('map1.jpg')  
+image = Image.open('map_cats.jpg')  
 
 # Convert the image to grayscale
 gray_image = image.convert('L')
@@ -15,22 +15,14 @@ gray_image = image.convert('L')
 image_array = np.array(gray_image)
 
 # Threshold the array to set black pixels to 1 and white pixels to 0
-binary_array = (image_array < 55).astype(np.uint8)
+binary_array = (image_array < 200).astype(np.uint8)
 
-# erode the image
-binary_array = mp.erosion(binary_array, mp.square(7))
-
-# dilate the image
-binary_array = mp.dilation(binary_array, mp.square(25))
-
-# erode the image
-binary_array = mp.erosion(binary_array, mp.square(18))
 
 # Save the binary array as an NPY file
-np.save('binary_image.npy', binary_array)
+np.save('binary_image_cats.npy', binary_array)
 
 # Load the binary array
-binary_array = np.load('binary_image.npy')
+binary_array = np.load('binary_image_cats.npy')
 
 # Plot image
 plt.imshow(binary_array, cmap='Greys')

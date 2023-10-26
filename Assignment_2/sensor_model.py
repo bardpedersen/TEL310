@@ -7,30 +7,49 @@ import numpy as np
 
 """
 Algorithm: Probability Normal Distribution
-Computing densities of a zero-centered normal distribution with variance c_2
+a = value
+b = mean
+c_2 = variance
+
 Returns p(ztk|xt, m)
 """
 def prob_normal_distribution(a, b, c_2):
     #return np.random.normal(a, math.sqrt(b_2))
+    if c_2 == 0:
+        return 0
     return (1/math.sqrt(2 * math.pi * c_2)) * math.exp(-0.5 * (((a-b) ** 2)/c_2))
 
 
 """
 Algorithm: Gaussian distribution
+ztk = lidar reading
+ztk_star = calculated lidar reading
+zmax = max range of the lidar
+sigma_hit = standard deviation for the hit probability
+
 Returns p(ztk|xt, m)
 """
 def p_hit(ztk, ztk_star, zmax, sigma_hit):
     if 0 <= ztk <= zmax:
-        N = prob_normal_distribution(ztk, ztk_star, sigma_hit**2)
-        cdf = (stats.norm.cdf([0, zmax], loc=ztk_star, scale=sigma_hit))
-        cdf = cdf[1] - cdf[0]
-        return cdf**(-1) * N 
+        normalize_hit = 0
+        for j in range(int(zmax)):
+            normalize_hit += prob_normal_distribution(j, ztk_star, sigma_hit**2)
+        
+        if normalize_hit == 0:
+            return 0
+        
+        N = 1 / normalize_hit
+        return N * prob_normal_distribution(ztk, ztk_star, sigma_hit**2)
     
     return 0
 
 
 """
 Algorithm: Exponential distribution
+ztk = lidar reading
+ztk_star = calculated lidar reading
+lambda_short = exponential decay rate
+
 Returns p(ztk|xt, m)
 """
 def p_short(ztk, ztk_star, lambda_short):
@@ -43,6 +62,9 @@ def p_short(ztk, ztk_star, lambda_short):
 
 """
 Algorithm: Uniform distribution
+ztk = lidar reading
+zmax = max range of the lidar
+
 Returns p(ztk|xt, m)
 """
 def p_max(ztk, zmax):
@@ -54,6 +76,9 @@ def p_max(ztk, zmax):
 
 """
 Algorithm: Uniform distribution
+ztk = lidar reading
+zmax = max range of the lidar
+
 Returns p(ztk|xt, m)
 """
 def p_rand(ztk, zmax):
@@ -64,11 +89,19 @@ def p_rand(ztk, zmax):
     
 
 """
+Algorithm: Ray casting
 xt =  [x, y, θ]T,  robot pose
+x = x position of robot
+y = y position of robot
+θ = orientation of robot
+
 m = map
+
 theta_z = angle of the lidar reading
 z_maxlen = max range of the lidar
 transpose = if the map has switch x and y coordinates
+
+Returns the calculated distance to the first occupied block in the map or the max range
 """
 def ray_casting(xt, m, theta_z, z_maxlen, transpose=False):
     x, y, theta = xt # x, y, θ (robot pose)
@@ -86,7 +119,8 @@ def ray_casting(xt, m, theta_z, z_maxlen, transpose=False):
 
 
 """
-zt = range scan in the range of [0;zmax]
+Algorithm: Beam range finder model
+zt = range scans
 xt = [x, y, θ]T, robot pose
 m = map
 
@@ -103,6 +137,10 @@ The sum of the weights (z_..) should be 1
 z_maxlen = max range of the lidar
 zt_start = start angle of the lidar (often positiv)
 zt_end = end angle of the lidar (often negativ)
+
+Returns the probability of the lidar reading given the robot pose and the map
+
+Dos not work
 """
 def beam_range_finder_model(zt, xt, m, Theta, z_maxlen, zt_start=0, zt_end=2*np.pi): #Start from left move to right
     z_hit, z_short, z_max, z_rand, sigma_hit, lambda_short = Theta
@@ -112,14 +150,15 @@ def beam_range_finder_model(zt, xt, m, Theta, z_maxlen, zt_start=0, zt_end=2*np.
     for i, ztk in enumerate(zt):
         # Compute the expected measurement for the current pose and map
         ztk_star = ray_casting(xt, m, angle[i], z_maxlen, transpose=True)
-
+        print(ztk_star)
+        print(ztk)
         # Compute the probability of the actual measurement given the expected measurement
         p_hit_ = p_hit(ztk, ztk_star, z_max, sigma_hit)
         p_short_ = p_short(ztk, ztk_star, lambda_short)
         p_max_ = p_max(ztk, z_max)
         p_rand_ = p_rand(ztk, z_max)
         p = z_hit * p_hit_ + z_short * p_short_ + z_max * p_max_ + z_rand * p_rand_
-        
+        print(p)
         # Update the total probability
         q *= p
     
@@ -127,92 +166,185 @@ def beam_range_finder_model(zt, xt, m, Theta, z_maxlen, zt_start=0, zt_end=2*np.
 
 
 """
+Algorithm: Learn intrinsic parameters
+Z = data set where each zi is an actual measurement
+X = data set where each xi is a robot pose
+m = map
+Theta = [z_hit, z_short, z_max, z_rand, sigma_hit, lambda_short]
+
+z_hit = weight for the hit probability
+z_short = weight for the short probability
+z_max = weight for the max probability
+z_rand = weight for the random probability
+sigma_hit = standard deviation for the hit probability
+lambda_short = exponential decay rate for the short probability
+The sum of the weights (z_..) should be 1
+
+z_maxlen = max range of the lidar
+angle = angle of the lidar with respect to the robot
+
+Returns the learned intrinsic parameters
+
+Todo add so Z contains multple readings
+zt_start=0, zt_end=2*np.pi
 """
-def learn_intrinsic_parameters(Z, X, m, Theta, z_maxlen=300, zt_start=0, zt_end=2*np.pi):
-    z_hit, z_short, z_max, z_rand, sigma_hit, lambda_short = Theta
-    ei_hit = []
-    ei_short = []
-    ei_max = []
-    ei_rand = []
-    zi_star_list = []
-    angle = np.linspace(zt_start, zt_end, len(Z))
+def learn_intrinsic_parameters(Z, X, m, Theta, z_maxlen=300, angle=0):
+    cur = Theta 
+    z_hit, z_short, z_max, z_rand, sigma_hit, lambda_short = cur
+    convergence = False
 
-    for i, zi in enumerate(Z): # Is zi one laser or multiple?
-        zi_star = ray_casting(X[i], m, angle[i], z_maxlen, transpose=True)
-        zi_star_list.append(zi_star)
-        n = 1/(p_hit(zi, zi_star, z_max, sigma_hit) + p_short(zi, zi_star, lambda_short) + p_max(zi, z_max) + p_rand(zi, z_max))
-        ei_hit.append(n * p_hit(zi, zi_star, z_max, sigma_hit))
-        ei_short.append(n * p_short(zi, zi_star, lambda_short))
-        ei_max.append(n * p_max(zi, z_max))
-        ei_rand.append(n * p_rand(zi, z_max))
+    while convergence == False:
+        ei_hit = []
+        ei_short = []
+        ei_max = []
+        ei_rand = []
+        zi_star_list = [] 
+        prev = cur
+        
+        for i, zi in enumerate(Z): # Zi one laser reading, Xi is one postion
+            zi_star = ray_casting(X[i], m, angle, z_maxlen, transpose=True)
+            zi_star_list.append(zi_star)
 
-    z_hit = sum(ei_hit) / len(Z)
-    z_short = sum(ei_short) / len(Z)
-    z_max = sum(ei_max) / len(Z)
-    z_rand = sum(ei_rand) / len(Z)
-    sigma_hit = math.sqrt(sum(ei_hit * (zi - zi_star)**2 for zi, zi_star in zip(Z, zi_star_list)) / sum(ei_hit))
-    lambda_short = sum(ei_short) / sum(ei_short * zi for zi in Z)
+            n = 1/(p_hit(zi, zi_star, z_maxlen, sigma_hit) + p_short(zi, zi_star, lambda_short) + p_max(zi, z_maxlen) + p_rand(zi, z_maxlen))
+                
+            ei_hit.append(n * p_hit(zi, zi_star, z_maxlen, sigma_hit))
+            ei_short.append(n * p_short(zi, zi_star, lambda_short))
+            ei_max.append(n * p_max(zi, z_maxlen))
+            ei_rand.append(n * p_rand(zi, z_maxlen))
+
+        z_hit = sum(ei_hit) / len(Z)
+        z_short = sum(ei_short) / len(Z)
+        z_max = sum(ei_max) / len(Z)
+        z_rand = sum(ei_rand) / len(Z)
+        sigma_hit = math.sqrt(sum(ei_hit[i] * (Z[i] - zi_star_list[i])**2 for i in range(len((Z)))) / sum(ei_hit))
+        lambda_short = sum(ei_short) / sum(ei_short[i] * Z[i] for i in range(len((Z))))
+
+        # Check if the parameters have converged
+        cur = [z_hit, z_short, z_max, z_rand, sigma_hit, lambda_short]
+        convergence = np.allclose(prev, cur, atol=0.01)
+
     return z_hit, z_short, z_max, z_rand, sigma_hit, lambda_short
 
 
 """
-"""
-def likelihood_field_range_finder_model(zt, xt, m, Theta):
-    z_hit, z_short, z_max, z_rand, sigma_hit, lambda_short = Theta
-    x, y, theta = xt
+Algorithm: Likelihood field range finder model
+zt = multiple range scans
 
+xt = [x, y, θ]T, robot pose
+x = x position of robot
+y = y position of robot
+θ = orientation of robot
+
+m = map
+
+theta = [z_hit, z_short, z_max, z_rand, sigma_hit, lambda_short]
+z_hit = weight for the hit probability
+z_short = weight for the short probability
+z_max = weight for the max probability
+z_rand = weight for the random probability
+sigma_hit = standard deviation for the hit probability
+lambda_short = exponential decay rate for the short probability
+The sum of the weights (z_..) should be 1
+
+z_maxlen = max range of the lidar
+
+sense_coord = sensor location in the robot coordinate system
+
+Returns the probability of the reading distance given the robot pose and the map
+"""
+def likelihood_field_range_finder_model(zt, xt, m, Theta, z_maxlen, sense_coord):
+    x, y, theta = xt # x, y, θ (robot pose)
+    z_hit, z_short, z_max, z_rand, sigma_hit, lambda_short = Theta
+    xk_sens, yk_sens, theta_k_sens = sense_coord  # Sensor location in the robot coordinate system    
     q = 1
-    xk_sens = None  # Vet ikke
-    yk_sens = None  # vet ikke
-    theta_k_sens = None  # vet ikke
-    x_ = None # vet ikke
-    y_ = None # vet ikke
+
+    blocked_list = [] # List of all blocked cells in the map
+    for x in range(m.shape[0]):
+        for y in range(m.shape[1]):
+            if m[x][y] == 1:
+                blocked_list.append([x, y])
 
     for ztk in zt:
-        if ztk != z_max:
+        if ztk != z_maxlen:
             xztk = x + xk_sens * np.cos(theta) - yk_sens * np.sin(theta) + ztk*np.cos(theta + theta_k_sens)
             yztk = y + yk_sens * np.cos(theta) + xk_sens * np.sin(theta) + ztk*np.sin(theta + theta_k_sens)
 
-            dist = min(np.sqrt((xztk - x_)**2 + (yztk - y_)**2), z_max)
+            list_dist = []
+            for x_, y_ in blocked_list:
+                list_dist.append(np.sqrt((xztk - x_)**2 + (yztk - y_)**2)) # Distance to all blocked cells in the map
 
+            dist = min(list_dist)
             prob_hit = stats.norm.pdf(dist, loc=0, scale=sigma_hit)
-            q *= (z_hit * prob_hit + z_rand / z_max)
+            q *= (z_hit * prob_hit + z_rand / z_maxlen)
     
     return q
 
+
 """
-cit = land marks
-mj = coordinates for landmark 
+Algorithm: Landmark model with known correspondence
+fit = [rit, thetait, sit]T, the landmark measurement
+rit = distance
+thetait = bearing
+sit = signature
+
+cit = [jx, jy, ji]T, the landmark identity
+jx = x position of landmark
+jy = y position of landmark
+ji = landmark identity
+
+xt = [x, y, θ]T, robot pose
+x = x position of robot
+y = y position of robot
+θ = orientation of robot
+
+m = map
+
+sigma = [sigma_r, sigma_theta]T, noise
+sigma_r = noise in distance
+sigma_theta = noise in bearing
+sigma_s = noise in signature
+
+Returns the probability of the landmark measurement given the robot pose and the map
 """
-def landmark_model_known_correspondence(fit, cit, xt, m):
-    x, y, theta = xt
+def landmark_model_known_correspondence(fit, cit, xt, m, sigma):
     rit, thetait, sit = fit
+    j_x, j_y, sj = cit
+    x, y, theta = xt
+    sigma_r, sigma_theta, sigma_s = sigma
 
-    sigma_r = None
-    sigma_theta = None
-    sigma_s = None
-    sj = None
-
-
-    j = cit
-    r_hat = np.sqrt((m[j][x] - x)**2 + (m[j][y] - y)**2)
-    theta_hat = np.arctan2(m[j][y] - y, m[j][x] - x)
+    r_hat = np.sqrt((m[j_x] - x)**2 + (m[j_y] - y)**2)
+    theta_hat = np.arctan2(m[j_y] - y, m[j_x] - x)
     return stats.norm.pdf(rit - r_hat, loc=0, scale=sigma_r) * stats.norm.pdf(thetait - theta_hat, loc=0, scale=sigma_theta) * stats.norm.pdf(sit - sj, loc=0, scale=sigma_s)
  
 
 """
+Algorithm: Landmark model with unknown correspondence
+fit = [rit, thetait, sit]T, the landmark measurement
+rit = distance
+thetait = bearing
+sit = signature
+
+cit = [jx, jy, ji]T, the landmark identity
+jx = x position of landmark
+jy = y position of landmark
+ji = landmark identity
+
+m = map
+
+sigma = [sigma_r, sigma_theta]T, noise
+
+Returns the pose of the robot
 """
-def  sample_landmark_model_known_correspondence(fit, cit, m):
-    rit, thetait, sit = fit
+def  sample_landmark_model_known_correspondence(fit, cit, m, sigma):
+    rit, thetait, sit = fit # rit = distance, thetait = bearing, sit = signature
+    sigma_r, sigma_theta = sigma # noise 
 
-    sigma_r = None
-    sigma_theta = None
-
-    j = cit
+    j = cit # landmark identity
+    j_x, j_y, j_i = j
     gamma_hat = np.random.uniform(0, 2*np.pi)
     r_hat = rit + np.random.normal(0, sigma_r)
     theta_hat = thetait + np.random.normal(0, sigma_theta)
-    x = m[j][x] + r_hat * np.cos(gamma_hat)
-    y = m[j][y] + r_hat * np.sin(gamma_hat)
+    x = m[j_x] + r_hat * np.cos(gamma_hat)
+    y = m[j_y] + r_hat * np.sin(gamma_hat)
     theta = gamma_hat - np.pi - theta_hat
-    return x, y, theta
+    return x, y, theta # return the pose of the robot
