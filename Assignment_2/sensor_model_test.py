@@ -15,6 +15,7 @@ def test_p_hit():
     list_av_values = []
     for ztk in z:
         list_av_values.append(sensor_model.p_hit(ztk, ztk_star, zmax, sigma_hit))
+    plt.title("p_hit")
     plt.plot(z, list_av_values)
     plt.show()
 
@@ -27,6 +28,7 @@ def test_p_short():
     list_av_values = []
     for ztk in z:
         list_av_values.append(sensor_model.p_short(ztk, ztk_star, lambda_short))
+    plt.title("p_short")
     plt.plot(z, list_av_values)
     plt.show()
 
@@ -37,6 +39,7 @@ def test_p_max():
     list_av_values = []
     for ztk in z:
         list_av_values.append(sensor_model.p_max(ztk, zmax))
+    plt.title("p_max")
     plt.plot(z, list_av_values)
     plt.show()
 
@@ -47,6 +50,7 @@ def test_p_rand():
     list_av_values = []
     for ztk in z:
         list_av_values.append(sensor_model.p_rand(ztk, zmax))
+    plt.title("p_rand")
     plt.plot(z, list_av_values)
     plt.show()
 
@@ -70,6 +74,7 @@ def test_all_p():
         value += z_max * (sensor_model.p_max(ztk, zmax))
         value += z_rand * (sensor_model.p_rand(ztk, zmax))
         list_av_values.append(value)
+    plt.title("p_all")
     plt.plot(z, list_av_values)
     plt.show()  
 
@@ -81,8 +86,7 @@ def test_ray_casting():
     zt_start = np.pi/4
     zt_end = -np.pi/4
     number_of_readings = 8
-    for theta in np.linspace(zt_start, zt_end, number_of_readings):
-        print(sensor_model.ray_casting(xt, loaded_map, theta, z_maxlen, transpose=True))
+    print(f"Ray casting values :{[sensor_model.ray_casting(xt, loaded_map, theta, z_maxlen, transpose=True) for theta in np.linspace(zt_start, zt_end, number_of_readings)]}")
 
 
 def test_ray_casting_plot(xt=np.array([200, 480, np.pi/2]), m=np.load('map/binary_image.npy'), number_of_readings=8, z_maxlen=500, zt_start=np.pi/2, zt_end=-np.pi/2, filename="test"):
@@ -117,7 +121,7 @@ def test_ray_casting_plot(xt=np.array([200, 480, np.pi/2]), m=np.load('map/binar
     plt.plot(x_list_st, y_list_st, 'g-')
     plt.savefig(f"images/{filename}.png")
     plt.close()
-    return f"{filename}.png"
+    return f"images/{filename}.png"
 
 
 def test_ray_casting_gif():
@@ -173,7 +177,7 @@ def test_ray_casting_gif():
 
     # Convert the individual plots to a GIF
     with Image.open(filenames[0]) as im:
-        im.save("images/animation1.gif", save_all=True, append_images=[Image.open(f) for f in filenames[1:]], duration=100, loop=0)
+        im.save("images/animation_front_laser.gif", save_all=True, append_images=[Image.open(f) for f in filenames[1:]], duration=100, loop=0)
 
     # Remove the individual plot files
     for f in filenames:
@@ -183,50 +187,73 @@ def test_ray_casting_gif():
 def test_beam_range_finder_model():
     xt=np.array([30 * 7.2, 80 * 6, np.pi/2])
     m = np.load('map/binary_image.npy')
-    zt = np.array([181.0, 154.0, 500, 278.0, 331.5, 481.0, 152.1, 183])
-    z_hit = 0.987437071809439
-    z_short = 0.005899442666981399
+    zt = np.array([182.0, 153.0, 500, 279.0, 331.0, 480.0, 153, 184])
+    noise = np.random.normal(0, 2, size=len(zt))
+    zt += noise
+
+    z_hit = 0.9656165275012334
+    z_short = 0.013197869913444309
     z_max = 0.0
-    z_rand =  0.006663485523579535
-    sigma_hit = 0.781811154161585
-    lambda_short = 0.003046710365994114
+    z_rand =  0.021185602585322268
+    sigma_hit = 2.277803215809316
+    lambda_short = 0.003070493203341887
 
     theta = np.array([z_hit, z_short, z_max, z_rand, sigma_hit, lambda_short])
     z_maxlen = 500
     zt_start = np.pi/4
     zt_end = -np.pi/4
-    print(f'{100 * sensor_model.beam_range_finder_model(zt, xt, m, theta, z_maxlen, zt_start, zt_end)} %')
+    print(f'beam range finder :{100 * sensor_model.beam_range_finder_model(zt, xt, m, theta, z_maxlen, zt_start, zt_end)} %')
 
 
 def test_learn_intrinsic_parameters():
-    Z = np.array([328.1,329.0,328.0,328.2]) # Needs nois
+    Z = np.array([329, 329.0, 329, 329.0])
+    noise = np.random.normal(0, 2, size=len(Z))
+    Z += noise
     X=np.array([[30 * 7.2, 80 * 6, np.pi/2],[30 * 7.2, 80 * 6, np.pi/2],
                 [30 * 7.2, 80 * 6, np.pi/2],[30 * 7.2, 80 * 6, np.pi/2]])
+    
     m = np.load('map/binary_image.npy')
     z_maxlen = 500
     angle = 0
     Theta = [0.5, 0.1, 0.2, 0.2, 0.8, 0.03]
     values = sensor_model.learn_intrinsic_parameters(Z, X, m, Theta, z_maxlen, angle)
-    print(sum(values[:4])) # Should be 1
-    print(values)
+    print(f"All params :{values}, Sum of z values :{sum(values[:4])}")
 
 
 def test_likelihood_field_range_finder_model():
-    zt = np.array([182.0, 154.5, 501, 277.0, 330.7, 481.6, 151.1, 183.5])
+    zt = np.array([182.0, 153.0, 500, 279.0, 331.0, 480.0, 153, 184])
+    noise = np.random.normal(0, 2, size=len(zt))
+    zt += noise
     xt=np.array([30 * 7.2, 80 * 6, np.pi/2])
     m = np.load('map/binary_image_cats.npy')
-    theta = np.array([0.987437071809439, 0.005899442666981399, 0.0, 0.006663485523579535, 0.781811154161585, 0.003046710365994114])
+    theta = np.array([0.9656165275012334, 0.013197869913444309, 0, 0.021185602585322268, 2.277803215809316, 0.003070493203341887])
     z_maxlen = 500
     sense_coord = np.array([0, 0, 0])
-    print(sensor_model.likelihood_field_range_finder_model(zt, xt, m, theta, z_maxlen, sense_coord))
-
+    print(f"Likelihood field :{100 * sensor_model.likelihood_field_range_finder_model(zt, xt, m, theta, z_maxlen, sense_coord)} %")
 
 def test_landmark_model_known_correspondence():
-    pass
+    fit = [350, -2.5, 1] #[rit, thetait, sit]
+    cit = [400, 200, 1] #[jx, jy, ji] 
+    xt=np.array([30 * 7.2, 80 * 6, np.pi/2])
+    sigma = [0.1, 0.05, 0.1] # sigma_r = 0.1, sigma_theta = 0.05, sigma_s = 0.1
+    print(f'Land mark model :{100 * sensor_model.landmark_model_known_correspondence(fit, cit, xt, sigma)} %')
 
 
 def test_sample_landmark_model_known_correspondence():
-    pass
+    fit = [355, -2.5, 1] #[rit, thetait, sit]
+    cit = [400, 200, 1] #[jx, jy, ji]
+    m = np.load('map/binary_image.npy')
+    sigma = [0.1, 0.05] # sigma_r = 0.1, sigma_theta = 0.05, sigma_s = 0.1
+
+    x_positions, y_positions, z_positions = zip(*(sensor_model.sample_landmark_model_known_correspondence(fit, cit, m, sigma) for _ in range(10000)))
+
+    plt.title("Sample landmark model")
+    plt.imshow(np.load('map/binary_image.npy'), cmap='Greys')
+    plt.scatter(x_positions, y_positions, c='b', marker='o')
+    plt.scatter(400,200, c='r', marker='o')
+    plt.scatter(216,480, c='r', marker='o')
+    plt.show()
+    # Should be [216.0, 480, 1.57]
 
 
 if __name__ == "__main__":
@@ -236,17 +263,11 @@ if __name__ == "__main__":
     #test_p_max()
     #test_p_rand()
     #test_all_p()
-
     #test_ray_casting()
     #test_ray_casting_plot()
     #test_ray_casting_gif()
-
-    #########test_beam_range_finder_model()
-
+    #test_beam_range_finder_model()
     #test_learn_intrinsic_parameters()
-
-    test_likelihood_field_range_finder_model()
-
+    #test_likelihood_field_range_finder_model()
     #test_landmark_model_known_correspondence()
-
-    #test_sample_landmark_model_known_correspondence()
+    test_sample_landmark_model_known_correspondence()

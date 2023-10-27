@@ -34,10 +34,7 @@ def p_hit(ztk, ztk_star, zmax, sigma_hit):
         normalize_hit = 0
         for j in range(int(zmax)):
             normalize_hit += prob_normal_distribution(j, ztk_star, sigma_hit**2)
-        
-        if normalize_hit == 0:
-            return 0
-        
+    
         N = 1 / normalize_hit
         return N * prob_normal_distribution(ztk, ztk_star, sigma_hit**2)
     
@@ -150,15 +147,12 @@ def beam_range_finder_model(zt, xt, m, Theta, z_maxlen, zt_start=0, zt_end=2*np.
     for i, ztk in enumerate(zt):
         # Compute the expected measurement for the current pose and map
         ztk_star = ray_casting(xt, m, angle[i], z_maxlen, transpose=True)
-        print(ztk_star)
-        print(ztk)
         # Compute the probability of the actual measurement given the expected measurement
-        p_hit_ = p_hit(ztk, ztk_star, z_max, sigma_hit)
+        p_hit_ = p_hit(ztk, ztk_star, z_maxlen, sigma_hit)
         p_short_ = p_short(ztk, ztk_star, lambda_short)
-        p_max_ = p_max(ztk, z_max)
-        p_rand_ = p_rand(ztk, z_max)
+        p_max_ = p_max(ztk, z_maxlen)
+        p_rand_ = p_rand(ztk, z_maxlen)
         p = z_hit * p_hit_ + z_short * p_short_ + z_max * p_max_ + z_rand * p_rand_
-        print(p)
         # Update the total probability
         q *= p
     
@@ -204,7 +198,6 @@ def learn_intrinsic_parameters(Z, X, m, Theta, z_maxlen=300, angle=0):
         for i, zi in enumerate(Z): # Zi one laser reading, Xi is one postion
             zi_star = ray_casting(X[i], m, angle, z_maxlen, transpose=True)
             zi_star_list.append(zi_star)
-
             n = 1/(p_hit(zi, zi_star, z_maxlen, sigma_hit) + p_short(zi, zi_star, lambda_short) + p_max(zi, z_maxlen) + p_rand(zi, z_maxlen))
                 
             ei_hit.append(n * p_hit(zi, zi_star, z_maxlen, sigma_hit))
@@ -297,23 +290,21 @@ x = x position of robot
 y = y position of robot
 θ = orientation of robot
 
-m = map
-
-sigma = [sigma_r, sigma_theta]T, noise
+sigma = [sigma_r, sigma_theta, sigma_s]T, noise
 sigma_r = noise in distance
 sigma_theta = noise in bearing
 sigma_s = noise in signature
 
 Returns the probability of the landmark measurement given the robot pose and the map
 """
-def landmark_model_known_correspondence(fit, cit, xt, m, sigma):
+def landmark_model_known_correspondence(fit, cit, xt, sigma):
     rit, thetait, sit = fit
     j_x, j_y, sj = cit
     x, y, theta = xt
     sigma_r, sigma_theta, sigma_s = sigma
 
-    r_hat = np.sqrt((m[j_x] - x)**2 + (m[j_y] - y)**2)
-    theta_hat = np.arctan2(m[j_y] - y, m[j_x] - x)
+    r_hat = np.sqrt((j_x - x)**2 + (j_y - y)**2)
+    theta_hat = np.arctan2(j_y - y, j_x - x) - theta
     return stats.norm.pdf(rit - r_hat, loc=0, scale=sigma_r) * stats.norm.pdf(thetait - theta_hat, loc=0, scale=sigma_theta) * stats.norm.pdf(sit - sj, loc=0, scale=sigma_s)
  
 
@@ -344,7 +335,25 @@ def  sample_landmark_model_known_correspondence(fit, cit, m, sigma):
     gamma_hat = np.random.uniform(0, 2*np.pi)
     r_hat = rit + np.random.normal(0, sigma_r)
     theta_hat = thetait + np.random.normal(0, sigma_theta)
-    x = m[j_x] + r_hat * np.cos(gamma_hat)
-    y = m[j_y] + r_hat * np.sin(gamma_hat)
+    x = j_x + r_hat * np.cos(gamma_hat)
+    y = j_y + r_hat * -np.sin(gamma_hat)
     theta = gamma_hat - np.pi - theta_hat
-    return x, y, theta # return the pose of the robot
+
+
+    # Only send data if the robot is in a free space, within the map, and no obsticle in the way
+    m = np.transpose(m)
+    if not (0 < x < m.shape[0] and 0 < y < m.shape[1]): # Check if the robot is within the map
+        return 0, 0, 0
+    
+    if m[int(x)][int(y)] == 1: # Check if the robot is in a free space
+        return 0, 0, 0
+    
+    # check if not obsticle in the way
+    for i in range(int(r_hat)): 
+        m_x = j_x + i * np.cos(gamma_hat) 
+        m_y = j_y + i * -np.sin(gamma_hat)
+        if 0 <= m_x < m.shape[0]-1 and 0 <= m_y < m.shape[1]-1:
+            if m[round(m_x)][round(m_y)] == 1:
+                return 0,0,0
+
+    return x, y, theta
