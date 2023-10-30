@@ -139,14 +139,15 @@ Returns the probability of the lidar reading given the robot pose and the map
 
 Dos not work
 """
-def beam_range_finder_model(zt, xt, m, Theta, z_maxlen, zt_start=0, zt_end=2*np.pi): #Start from left move to right
+def beam_range_finder_model(zt, xt, m, Theta, z_maxlen, zt_start=0, zt_end=2*np.pi, transpose=True): #Start from left move to right
     z_hit, z_short, z_max, z_rand, sigma_hit, lambda_short = Theta
     angle = np.linspace(zt_start, zt_end, len(zt)) # Each angle for each lidar reading
     q = 1.0
 
     for i, ztk in enumerate(zt):
         # Compute the expected measurement for the current pose and map
-        ztk_star = ray_casting(xt, m, angle[i], z_maxlen, transpose=True)
+        ztk_star = ray_casting(xt, m, angle[i], z_maxlen, transpose)
+
         # Compute the probability of the actual measurement given the expected measurement
         p_hit_ = p_hit(ztk, ztk_star, z_maxlen, sigma_hit)
         p_short_ = p_short(ztk, ztk_star, lambda_short)
@@ -155,7 +156,7 @@ def beam_range_finder_model(zt, xt, m, Theta, z_maxlen, zt_start=0, zt_end=2*np.
         p = z_hit * p_hit_ + z_short * p_short_ + z_max * p_max_ + z_rand * p_rand_
         # Update the total probability
         q *= p
-    
+        
     return q
 
 
@@ -245,11 +246,14 @@ sense_coord = sensor location in the robot coordinate system
 
 Returns the probability of the reading distance given the robot pose and the map
 """
-def likelihood_field_range_finder_model(zt, xt, m, Theta, z_maxlen, sense_coord):
+def likelihood_field_range_finder_model(zt, xt, m, Theta, z_maxlen, sense_coord, transpose=False):
     x, y, theta = xt # x, y, θ (robot pose)
     z_hit, z_short, z_max, z_rand, sigma_hit, lambda_short = Theta
     xk_sens, yk_sens, theta_k_sens = sense_coord  # Sensor location in the robot coordinate system    
     q = 1
+
+    if transpose:
+        m = np.transpose(m)
 
     blocked_list = [] # List of all blocked cells in the map
     for x in range(m.shape[0]):

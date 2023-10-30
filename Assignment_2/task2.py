@@ -1,124 +1,153 @@
 #!/usr/bin/env python3 
 
 import sensor_model
-import matplotlib.pyplot as plt
 import numpy as np
-import os
-from PIL import Image
 
 
-def test_ray_casting_plot(xt=np.array([200, 480, np.pi/2]), m=np.load('map/binary_image_cats.npy'), number_of_readings=8, z_maxlen=500, zt_start=np.pi/2, zt_end=-np.pi/2, filename="test"):
-    transpose = True
-    plt.imshow(m, cmap='Greys')
-    plt.plot(xt[0], xt[1], 'ro')
-    x_list = []
-    y_list = []
-    x_list_st = []
-    y_list_st = []
-    tolerance = 0.1
-
-    x, y, theta = xt # x, y, θ (robot pose)
-    angle_inc = np.linspace(zt_start, zt_end, number_of_readings) # For lidar
-    if transpose: # Transpose the map when x is y and y is x
-        m = np.transpose(m)
-
-    for angle in angle_inc:
-        for i in range(int(z_maxlen)): # For every block in the map up to the max range
-            m_x = x + i * np.cos(angle + theta) 
-            m_y = y + i * -np.sin(angle + theta) # -sin is only nessasary when the map is wrong // else sin
-            if tolerance < angle < tolerance:
-                x_list_st.append(m_x)
-                y_list_st.append(m_y)
-            else:
-                x_list.append(m_x)
-                y_list.append(m_y)
-            if m[round(m_x)][round(m_y)] == 1: # If the block is occupied
-                break # Return the distance to the block
-                
-    plt.plot(x_list, y_list, 'b-')
-    plt.plot(x_list_st, y_list_st, 'g-')
-    plt.savefig(f"{filename}.png")
-    plt.close()
-    return f"{filename}.png"
-
-
-def test_ray_casting_gif():
-    number_of_readings = 10
-    zt_start = np.pi/4
-    zt_end = -np.pi/4
+def task2_likelihood():
+    likelihood = []
+    zt_start = 0
+    zt_end = 2*np.pi
     z_maxlen = 500
-    loaded_map = np.load('map/binary_image_cats.npy')
-    filenames = []
-
-    xt = np.array([30 * 7.2, 80 * 6, np.pi/2])
-    filenames.append(test_ray_casting_plot(xt, loaded_map, number_of_readings, z_maxlen, zt_start, zt_end, filename="plot_1"))
-    xt = np.array([30 * 7.2, 75 * 6, np.pi/2])
-    filenames.append(test_ray_casting_plot(xt, loaded_map, number_of_readings, z_maxlen, zt_start, zt_end, filename="plot_2"))
-    xt = np.array([30 * 7.2, 70 * 6, np.pi/2])
-    filenames.append(test_ray_casting_plot(xt, loaded_map, number_of_readings, z_maxlen, zt_start, zt_end, filename="plot_3"))
-    xt = np.array([30 * 7.2, 65 * 6, np.pi/2])
-    filenames.append(test_ray_casting_plot(xt, loaded_map, number_of_readings, z_maxlen, zt_start, zt_end, filename="plot_4"))
-    xt = np.array([30 * 7.2, 60 * 6, np.pi/2])
-    filenames.append(test_ray_casting_plot(xt, loaded_map, number_of_readings, z_maxlen, zt_start, zt_end, filename="plot_5"))
-    xt = np.array([30 * 7.2, 55 * 6, np.pi/2])
-    filenames.append(test_ray_casting_plot(xt, loaded_map, number_of_readings, z_maxlen, zt_start, zt_end, filename="plot_6"))
-    xt = np.array([30 * 7.2, 50 * 6, np.pi/2])
-    filenames.append(test_ray_casting_plot(xt, loaded_map, number_of_readings, z_maxlen, zt_start, zt_end, filename="plot_7"))
-    xt = np.array([33 * 7.2, 46 * 6, np.pi/3])
-    filenames.append(test_ray_casting_plot(xt, loaded_map, number_of_readings, z_maxlen, zt_start, zt_end, filename="plot_8"))
-    xt = np.array([36 * 7.2, 43 * 6, np.pi/6])
-    filenames.append(test_ray_casting_plot(xt, loaded_map, number_of_readings, z_maxlen, zt_start, zt_end, filename="plot_9"))
-    xt = np.array([40 * 7.2, 40 * 6, 0])
-    filenames.append(test_ray_casting_plot(xt, loaded_map, number_of_readings, z_maxlen, zt_start, zt_end, filename="plot_10"))
-    xt = np.array([41 * 7.2, 42 * 6, -np.pi/8])
-    filenames.append(test_ray_casting_plot(xt, loaded_map, number_of_readings, z_maxlen, zt_start, zt_end, filename="plot_11"))
-    xt = np.array([42 * 7.2, 44 * 6, -np.pi/4])
-    filenames.append(test_ray_casting_plot(xt, loaded_map, number_of_readings, z_maxlen, zt_start, zt_end, filename="plot_12"))
-    xt = np.array([43 * 7.2, 47 * 6, -np.pi/4])
-    filenames.append(test_ray_casting_plot(xt, loaded_map, number_of_readings, z_maxlen, zt_start, zt_end, filename="plot_13"))
-    xt = np.array([44 * 7.2, 49 * 6, -np.pi/8])
-    filenames.append(test_ray_casting_plot(xt, loaded_map, number_of_readings, z_maxlen, zt_start, zt_end, filename="plot_14"))
-    xt = np.array([45 * 7.2, 52 * 6, 0])
-    filenames.append(test_ray_casting_plot(xt, loaded_map, number_of_readings, z_maxlen, zt_start, zt_end, filename="plot_15"))
-    xt = np.array([53 * 7.2, 54 * 6, np.pi/12])
-    filenames.append(test_ray_casting_plot(xt, loaded_map, number_of_readings, z_maxlen, zt_start, zt_end, filename="plot_16"))
-    xt = np.array([60 * 7.2, 56 * 6, np.pi/6])
-    filenames.append(test_ray_casting_plot(xt, loaded_map, number_of_readings, z_maxlen, zt_start, zt_end, filename="plot_17"))
-    xt = np.array([68 * 7.2, 50 * 6, np.pi/4])
-    filenames.append(test_ray_casting_plot(xt, loaded_map, number_of_readings, z_maxlen, zt_start, zt_end, filename="plot_18"))
-    xt = np.array([75 * 7.2, 43 * 6, np.pi/4])
-    filenames.append(test_ray_casting_plot(xt, loaded_map, number_of_readings, z_maxlen, zt_start, zt_end, filename="plot_19"))
-    xt = np.array([83 * 7.2, 36 * 6, np.pi/4])
-    filenames.append(test_ray_casting_plot(xt, loaded_map, number_of_readings, z_maxlen, zt_start, zt_end, filename="plot_20"))
-    xt = np.array([90 * 7.2, 30 * 6, np.pi/4])
-    filenames.append(test_ray_casting_plot(xt, loaded_map, number_of_readings, z_maxlen, zt_start, zt_end, filename="plot_21"))
-
-    # Convert the individual plots to a GIF
-    with Image.open(filenames[0]) as im:
-        im.save("images/task2.gif", save_all=True, append_images=[Image.open(f) for f in filenames[1:]], duration=100, loop=0)
-
-    # Remove the individual plot files
-    for f in filenames:
-        os.remove(f)
-
-
-def test_beam_range_finder_model():
-    xt=np.array([30 * 7.2, 80 * 6, np.pi/2])
-    m = np.load('map/binary_image.npy')
-    zt = np.array([182.0, 153.0, 500, 279.0, 331.0, 480.0, 153.0, 184])
+    m = np.load('map/binary_image_cats.npy')
     z_hit = 0.40
     z_short = 0.20
     z_max = 0.25
     z_rand =  0.15
     sigma_hit = 0.1
     lambda_short = 0.5
-
     theta = np.array([z_hit, z_short, z_max, z_rand, sigma_hit, lambda_short])
-    z_maxlen = 500
-    zt_start = np.pi/4
-    zt_end = -np.pi/4
-    print(f'{100 * sensor_model.beam_range_finder_model(zt, xt, m, theta, z_maxlen, zt_start, zt_end)} %')
+
+    noise = np.random.normal(0, 2, size=8) 
+
+    xt = np.array([30 * 7.2, 80 * 6, np.pi/2])
+    zt = np.array([327.0, 203.0, 142, 99.0, 99.0, 149.0, 184.0, 327])
+    noise = np.random.normal(0, 2, size=8) 
+    zt += noise
+    likelihood.append(sensor_model.beam_range_finder_model(zt, xt, m, theta, z_maxlen, zt_start, zt_end))
+    
+    xt = np.array([30 * 7.2, 75 * 6, np.pi/2])
+    zt = np.array([297.0, 158.0, 209.00000000000003, 131.99999999999994, 132.00000000000006, 149.0, 156.99999999999997, 297.0])
+    noise = np.random.normal(0, 2, size=8) 
+    zt += noise
+    likelihood.append(sensor_model.beam_range_finder_model(zt, xt, m, theta, z_maxlen, zt_start, zt_end))
+    
+    xt = np.array([30 * 7.2, 70 * 6, np.pi/2])
+    zt = np.array([267.0, 107.00000000000001, 209.00000000000003, 165.0, 164.99999999999997, 150.00000000000003, 107.0, 267.0])
+    noise = np.random.normal(0, 2, size=8) 
+    zt += noise
+    likelihood.append(sensor_model.beam_range_finder_model(zt, xt, m, theta, z_maxlen, zt_start, zt_end))
+    
+    xt = np.array([30 * 7.2, 65 * 6, np.pi/2])
+    zt = np.array([237.0, 261.0, 209.00000000000003, 199.00000000000003, 198.99999999999997, 148.0, 330.0, 237.0])
+    noise = np.random.normal(0, 2, size=8) 
+    zt += noise
+    likelihood.append(sensor_model.beam_range_finder_model(zt, xt, m, theta, z_maxlen, zt_start, zt_end))
+    
+    xt = np.array([30 * 7.2, 60 * 6, np.pi/2])
+    zt = np.array([207.0, 261.0, 208.0, 232.00000000000006, 232.00000000000003, 148.0, 313.0, 207.0])
+    noise = np.random.normal(0, 2, size=8) 
+    zt += noise    
+    likelihood.append(sensor_model.beam_range_finder_model(zt, xt, m, theta, z_maxlen, zt_start, zt_end))
+    
+    xt = np.array([30 * 7.2, 55 * 6, np.pi/2])
+    zt = np.array([177.0, 261.0, 66.99999999999999, 265.0, 265.0, 79.99999999999997, 297.0, 177.0])
+    noise = np.random.normal(0, 2, size=8) 
+    zt += noise
+    likelihood.append(sensor_model.beam_range_finder_model(zt, xt, m, theta, z_maxlen, zt_start, zt_end))
+    
+    xt = np.array([30 * 7.2, 50 * 6, np.pi/2])
+    zt = np.array([147.0, 261.0, 183.0, 299.0, 299.0, 389.0, 280.0, 147.0])
+    noise = np.random.normal(0, 2, size=8) 
+    zt += noise
+    likelihood.append(sensor_model.beam_range_finder_model(zt, xt, m, theta, z_maxlen, zt_start, zt_end))
+
+    xt = np.array([33 * 7.2, 46 * 6, np.pi/3])
+    zt = np.array([259.0, 123.99999999999999, 236.0, 114.99999999999999, 294.0, 95.0, 272.0, 259.0])
+    noise = np.random.normal(0, 2, size=8) 
+    zt += noise
+    likelihood.append(sensor_model.beam_range_finder_model(zt, xt, m, theta, z_maxlen, zt_start, zt_end))
+
+    xt = np.array([36 * 7.2, 43 * 6, np.pi/6])
+    zt = np.array([219.99999999999997, 248.99999999999997, 98.99999999999999, 248.0, 313.0, 325.0, 358.0, 219.99999999999997])
+    noise = np.random.normal(0, 2, size=8) 
+    zt += noise
+    likelihood.append(sensor_model.beam_range_finder_model(zt, xt, m, theta, z_maxlen, zt_start, zt_end))
+
+    xt = np.array([40 * 7.2, 40 * 6, 0])
+    zt = np.array([433.0, 196.99999999999997, 234.99999999999997, 105.99999999999999, 231.99999999999997, 338.0, 129.0, 433.0])
+    noise = np.random.normal(0, 2, size=8) 
+    zt += noise
+    likelihood.append(sensor_model.beam_range_finder_model(zt, xt, m, theta, z_maxlen, zt_start, zt_end))
+
+    xt = np.array([41 * 7.2, 42 * 6, -np.pi/8])
+    zt = np.array([334.0, 186.99999999999997, 243.99999999999997, 131.0, 284.0, 365.0, 93.00000000000001, 334.0])
+    noise = np.random.normal(0, 2, size=8) 
+    zt += noise
+    likelihood.append(sensor_model.beam_range_finder_model(zt, xt, m, theta, z_maxlen, zt_start, zt_end))
+
+    xt = np.array([42 * 7.2, 44 * 6, -np.pi/4])
+    zt = np.array([279.0, 420.99999999999994, 207.00000000000003, 268.0, 308.0, 343.0, 79.0, 279.0])
+    noise = np.random.normal(0, 2, size=8) 
+    zt += noise
+    likelihood.append(sensor_model.beam_range_finder_model(zt, xt, m, theta, z_maxlen, zt_start, zt_end))
+
+    xt = np.array([43 * 7.2, 47 * 6, -np.pi/4])
+    zt = np.array([83.00000000000003, 380.0000000000001, 211.0, 287.0, 315.0, 351.0, 59.000000000000036, 83.00000000000003])
+    noise = np.random.normal(0, 2, size=8) 
+    zt += noise
+    likelihood.append(sensor_model.beam_range_finder_model(zt, xt, m, theta, z_maxlen, zt_start, zt_end))
+
+    xt = np.array([44 * 7.2, 49 * 6, -np.pi/8])
+    zt = np.array([281.0, 192.0, 251.0, 187.0, 305.0, 337.0, 49.00000000000002, 280.99999999999994])
+    noise = np.random.normal(0, 2, size=8) 
+    zt += noise
+    likelihood.append(sensor_model.beam_range_finder_model(zt, xt, m, theta, z_maxlen, zt_start, zt_end))
+
+    xt = np.array([45 * 7.2, 52 * 6, 0])
+    zt = np.array([397.0, 206.00000000000003, 309.0, 346.0, 344.0, 29.999999999999996, 36.99999999999999, 397.0])
+    noise = np.random.normal(0, 2, size=8) 
+    zt += noise
+    likelihood.append(sensor_model.beam_range_finder_model(zt, xt, m, theta, z_maxlen, zt_start, zt_end))
+
+    xt = np.array([53 * 7.2, 54 * 6, np.pi/12])
+    zt = np.array([327.0, 183.00000000000003, 354.0, 376.00000000000006, 25.99999999999999, 244.99999999999994, 188.0, 326.99999999999994])
+    noise = np.random.normal(0, 2, size=8) 
+    zt += noise
+    likelihood.append(sensor_model.beam_range_finder_model(zt, xt, m, theta, z_maxlen, zt_start, zt_end))
+
+    xt = np.array([60 * 7.2, 56 * 6, np.pi/6])
+    zt = np.array([334.0, 177.0, 253.99999999999997, 60.99999999999997, 106.0, 151.0, 163.0, 334.00000000000006])
+    noise = np.random.normal(0, 2, size=8) 
+    zt += noise
+    likelihood.append(sensor_model.beam_range_finder_model(zt, xt, m, theta, z_maxlen, zt_start, zt_end))
+
+    xt = np.array([68 * 7.2, 50 * 6, np.pi/4])
+    zt = np.array([327.0, 110.00000000000001, 276.0, 125.99999999999999, 285.0, 133.99999999999997, 232.99999999999997, 327.0])
+    noise = np.random.normal(0, 2, size=8) 
+    zt += noise
+    likelihood.append(sensor_model.beam_range_finder_model(zt, xt, m, theta, z_maxlen, zt_start, zt_end))
+
+    xt = np.array([75 * 7.2, 43 * 6, np.pi/4])
+    zt = np.array([255.99999999999997, 247.00000000000003, 460.0, 249.99999999999997, 133.0, 135.99999999999997, 182.00000000000009, 256.00000000000006])
+    noise = np.random.normal(0, 2, size=8) 
+    zt += noise
+    likelihood.append(sensor_model.beam_range_finder_model(zt, xt, m, theta, z_maxlen, zt_start, zt_end))
+
+    xt = np.array([83 * 7.2, 36 * 6, np.pi/4])
+    zt = np.array([173.99999999999997, 98.00000000000001, 175.0, 500, 206.99999999999997, 232.00000000000003, 85.00000000000004, 173.99999999999997])
+    noise = np.random.normal(0, 2, size=8) 
+    zt += noise
+    zt[3] = 500
+    likelihood.append(sensor_model.beam_range_finder_model(zt, xt, m, theta, z_maxlen, zt_start, zt_end))
+
+    xt = np.array([90 * 7.2, 30 * 6, np.pi/4])
+    zt = np.array([103.00000000000001, 170.0, 316.0, 140.99999999999997, 239.99999999999997, 54.00000000000003, 73.00000000000006, 103.0])
+    noise = np.random.normal(0, 2, size=8) 
+    zt += noise
+    likelihood.append(sensor_model.beam_range_finder_model(zt, xt, m, theta, z_maxlen, zt_start, zt_end))
+
+    print(likelihood)
 
 if __name__ == "__main__":
-    # test_ray_casting_gif()
-    test_ray_casting_gif()
+    task2_likelihood()
