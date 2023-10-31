@@ -3,19 +3,23 @@
 import sensor_model
 import numpy as np
 
-
+"""
+Function for calculating p(zt|xt, m) at 21 different poses i the map, representing the robot's trajectory.
+See images/task2.gif for the robot's trajectory in the map.
+Her the green beam represents the robots front, theta from xt.
+"""
 def task2_likelihood():
     likelihood = []
     zt_start = 0
     zt_end = 2*np.pi
     z_maxlen = 500
     m = np.load('map/binary_image_cats.npy')
-    z_hit = 0.40
-    z_short = 0.20
-    z_max = 0.25
-    z_rand =  0.15
-    sigma_hit = 0.1
-    lambda_short = 0.5
+    z_hit = 0.8157123986145881
+    z_short = 0.00235666025958796
+    z_max = 0.16552184295092348
+    z_rand =  0.01640909817490046
+    sigma_hit = 1.9665518618953464
+    lambda_short = 0.0029480342354130016
     theta = np.array([z_hit, z_short, z_max, z_rand, sigma_hit, lambda_short])
 
     noise = np.random.normal(0, 2, size=8) 
@@ -147,7 +151,8 @@ def task2_likelihood():
     zt += noise
     likelihood.append(sensor_model.beam_range_finder_model(zt, xt, m, theta, z_maxlen, zt_start, zt_end))
 
-    print(likelihood)
+    for i in likelihood:
+        print(i)
 
 if __name__ == "__main__":
     task2_likelihood()

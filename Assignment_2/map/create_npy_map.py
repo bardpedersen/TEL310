@@ -5,6 +5,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import skimage.morphology as mp
 
+"""
+File for create a binary np array map from a image
+"""
+
 # Load the image
 image = Image.open('map_cats.jpg')  
 
@@ -16,7 +20,6 @@ image_array = np.array(gray_image)
 
 # Threshold the array to set black pixels to 1 and white pixels to 0
 binary_array = (image_array < 200).astype(np.uint8)
-
 
 # Save the binary array as an NPY file
 np.save('binary_image_cats.npy', binary_array)

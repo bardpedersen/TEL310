@@ -109,6 +109,7 @@ def ray_casting(xt, m, theta_z, z_maxlen, transpose=False):
     for i in range(int(z_maxlen)): # For every block in the map up to the max range
         m_x = x + i * np.cos(theta + theta_z) 
         m_y = y + i * -np.sin(theta + theta_z) # -sin is only nessasary when the map is wrong // else sin
+        
         if m[round(m_x)][round(m_y)] == 1: # If the block is occupied
             return np.sqrt((m_x - x)**2 + (m_y - y)**2) # Return the distance to the block
         
@@ -183,7 +184,7 @@ Returns the learned intrinsic parameters
 Todo add so Z contains multple readings
 zt_start=0, zt_end=2*np.pi
 """
-def learn_intrinsic_parameters(Z, X, m, Theta, z_maxlen=300, angle=0):
+def learn_intrinsic_parameters(Z, X, m, Theta, z_maxlen=500, angle=0):
     cur = Theta 
     z_hit, z_short, z_max, z_rand, sigma_hit, lambda_short = cur
     convergence = False
@@ -200,7 +201,6 @@ def learn_intrinsic_parameters(Z, X, m, Theta, z_maxlen=300, angle=0):
             zi_star = ray_casting(X[i], m, angle, z_maxlen, transpose=True)
             zi_star_list.append(zi_star)
             n = 1/(p_hit(zi, zi_star, z_maxlen, sigma_hit) + p_short(zi, zi_star, lambda_short) + p_max(zi, z_maxlen) + p_rand(zi, z_maxlen))
-                
             ei_hit.append(n * p_hit(zi, zi_star, z_maxlen, sigma_hit))
             ei_short.append(n * p_short(zi, zi_star, lambda_short))
             ei_max.append(n * p_max(zi, z_maxlen))
@@ -242,30 +242,30 @@ The sum of the weights (z_..) should be 1
 
 z_maxlen = max range of the lidar
 
-sense_coord = sensor location in the robot coordinate system
+sense_coord = [Xk_sense, Yk_sense, Thetak_sense] sensor location in the robot coordinate system
 
 Returns the probability of the reading distance given the robot pose and the map
 """
-def likelihood_field_range_finder_model(zt, xt, m, Theta, z_maxlen, sense_coord, transpose=False):
+def likelihood_field_range_finder_model(zt, xt, m, Theta, z_maxlen, sense_coord, zt_start, zt_end, transpose=False):
     x, y, theta = xt # x, y, θ (robot pose)
     z_hit, z_short, z_max, z_rand, sigma_hit, lambda_short = Theta
     xk_sens, yk_sens, theta_k_sens = sense_coord  # Sensor location in the robot coordinate system    
+    angle = np.linspace(zt_start, zt_end, len(zt))
     q = 1
 
     if transpose:
         m = np.transpose(m)
 
     blocked_list = [] # List of all blocked cells in the map
-    for x in range(m.shape[0]):
-        for y in range(m.shape[1]):
-            if m[x][y] == 1:
-                blocked_list.append([x, y])
+    for x_i in range(m.shape[0]):
+        for y_i in range(m.shape[1]):
+            if m[x_i][y_i] == 1:
+                blocked_list.append([x_i, y_i])
 
-    for ztk in zt:
+    for i, ztk in enumerate(zt):
         if ztk != z_maxlen:
-            xztk = x + xk_sens * np.cos(theta) - yk_sens * np.sin(theta) + ztk*np.cos(theta + theta_k_sens)
-            yztk = y + yk_sens * np.cos(theta) + xk_sens * np.sin(theta) + ztk*np.sin(theta + theta_k_sens)
-
+            xztk = x + xk_sens * np.cos(theta) - yk_sens * np.sin(theta) + ztk*np.cos(theta + theta_k_sens + angle[i])
+            yztk = y + yk_sens * np.cos(theta) + xk_sens * np.sin(theta) - ztk*np.sin(theta + theta_k_sens + angle[i]) # -sin is only nessasary when the map is wrong // else sin
             list_dist = []
             for x_, y_ in blocked_list:
                 list_dist.append(np.sqrt((xztk - x_)**2 + (yztk - y_)**2)) # Distance to all blocked cells in the map
