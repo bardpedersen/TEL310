@@ -5,69 +5,105 @@ import numpy as np
 
 """
 Gaussian estimate of the robot pose at time t-1, with mean μt-1 and covariance Σt-1
-control = ut
-map = m
 
+μt_1 = [xt_1, yt_1, θt_1] is the mean of the robot pose at time t-1
+Σt_1 is the covariance of the robot pose at time t-1
 
+ut = [vt, wt] is the control input
+zt = {zt1,zt2,...} ranges to landmarks, where each zti = [rti, phiti, sti] is the range, bearing, and signature of the landmark
+ct = {ct1,ct2,...} are the landmark ids 
+m is the map of the environment
+delta t is the time interval between t-1 and t
 
+alpha = [a1, a2, a3, a4] are the motion noise parameters
+sigma = [sigma_r, sigma_phi, sigma_s] are the measurement noise parameters
+
+Returns the mean and covariance of the robot pose at time t, μt and Σt, and the
 likelihood of the feature observation, pzt
 """
-def EKF_localization_known_correspondences(μt_1, Σt_1, ut, zt, ct, m):
-    theta = μt_1[2]
+def EKF_localization_known_correspondences(μt_1, Σt_1, ut, zt, ct, delta_t, alpha, sigma):
+    x, y, theta = μt_1
     vt, wt = ut
-    delta_t = None ##########
-    a1, a2, a3, a4 = None ##########
-    sigma_r, sigma_phi, sigma_s = None ##########
-
-
-    Gt = np.array([[1, 0, -vt/wt*math.cos(theta) + vt/wt*math.cos(theta + wt*delta_t)],
-                    [0, 1, -vt/wt*math.sin(theta) + vt/wt*math.sin(theta + wt*delta_t)],
-                    [0, 0, 1]])
-
-    Vt = np.array([[(-math.sin(theta) + math.sin(theta + wt*delta_t))/wt, vt*(math.sin(theta) - math.sin(theta + wt*delta_t))/wt**2 + vt*math.cos(theta + wt*delta_t)*delta_t/wt],
-                    [(math.cos(theta) - math.cos(theta + wt*delta_t))/wt, -vt*(math.cos(theta) - math.cos(theta + wt*delta_t))/wt**2 + vt*math.sin(theta + wt*delta_t)*delta_t/wt],
-                    [0, delta_t]])
+    a1, a2, a3, a4 = alpha
+    sigma_r, sigma_phi, sigma_s = sigma
+    wt_close_zero = 1e-4
     
+    if abs(wt) > wt_close_zero:
+        # Jacobian of the motion model
+        Gt = np.array([[1, 0, -vt/wt*math.cos(theta) + vt/wt*math.cos(theta + wt*delta_t)],
+                        [0, 1, -vt/wt*math.sin(theta) + vt/wt*math.sin(theta + wt*delta_t)],
+                        [0, 0, 1]]) 
+
+        Vt = np.array([[(-math.sin(theta) + math.sin(theta + wt*delta_t))/wt, vt*(math.sin(theta) - math.sin(theta + wt*delta_t))/wt**2 + vt*math.cos(theta + wt*delta_t)*delta_t/wt],
+                        [(math.cos(theta) - math.cos(theta + wt*delta_t))/wt, -vt*(math.cos(theta) - math.cos(theta + wt*delta_t))/wt**2 + vt*math.sin(theta + wt*delta_t)*delta_t/wt],
+                        [0, delta_t]]) 
+        
+        # Prediction
+        μ_hat_t = μt_1 + np.array([-vt/wt*math.sin(theta) + vt/wt*math.sin(theta + wt*delta_t),
+                            vt/wt*math.cos(theta) - vt/wt*math.cos(theta + wt*delta_t),
+                            wt*delta_t]) 
+        
+    else: # For when wt is close to zero
+        # Jacobian of the motion model
+        Gt = np.array([[1, 0, -vt*math.sin(theta)*delta_t],
+                        [0, 1, vt*math.cos(theta)*delta_t],
+                        [0, 0, 1]]) 
+
+        Vt = np.array([[math.cos(theta)*delta_t, -vt*math.sin(theta)*delta_t*delta_t*0.5],
+                        [math.sin(theta)*delta_t, vt*math.cos(theta)*delta_t*delta_t*0.5],
+                        [0, delta_t]])
+        
+        # Prediction
+        μ_hat_t = μt_1 + np.array([vt*math.cos(theta)*delta_t,
+                                    vt*math.sin(theta)*delta_t,
+                                    0]) 
+
+    # Motion noise covariance matrix from the control input
     Mt = np.array([[a1*vt**2 + a2*wt**2, 0],
                     [0, a3*vt**2 + a4*wt**2]])
     
-    μ_hat_t = μt_1 + np.array([[-vt/wt*math.sin(theta) + vt/wt*math.sin(theta + wt*delta_t)],
-                        [vt/wt*math.cos(theta) - vt/wt*math.cos(theta + wt*delta_t)],
-                        [wt*delta_t]])
-
-    Σ_hat_t = Gt @ Σt_1 @ np.transpose(Gt) + Vt @ Mt @ np.transpose(Vt)
+    Σ_hat_t = Gt @ Σt_1 @ np.transpose(Gt) + Vt @ Mt @ np.transpose(Vt) 
 
     Qt = np.array([[sigma_r**2, 0, 0],
                     [0, sigma_phi**2, 0],
                     [0, 0, sigma_s**2]])
 
-    for zti in zt:
-        rti, phiti, sti = zti
-        j = cti
-        j_x, j_y, j_s = None ##########
+    for i in range(len(zt)):
+        rti, phiti, sti = zt[i]
+        j_x, j_y, j_s = ct[i] # j_x, j_y are the coordinates of the landmark, in book represented as m[j,x]. j_s is the signature.
 
-        q = (m[j_x] - μ_hat_t[0])**2 + (m[j_y] - μ_hat_t[1])**2
-        z_hat_t_i = np.array([[math.sqrt(q)],
-                            [math.atan2(m[j_y] - μ_hat_t[1], m[j_x] - μ_hat_t[0]) - μ_hat_t[2]],
-                            [m[j_s]]])
+        q = (j_x - μ_hat_t[0])**2 + (j_y - μ_hat_t[1])**2
+
+        z_hat_t_i = np.array([math.sqrt(q),
+                            math.atan2(j_y - μ_hat_t[1], j_x - μ_hat_t[0]) - μ_hat_t[2],
+                            j_s])
         
-        Hti = np.array([[-(m[j_x] - μ_hat_t[0])/math.sqrt(q), -(m[j_y] - μ_hat_t[1])/math.sqrt(q), 0],
-                        [(m[j_y] - μ_hat_t[1])/q, -(m[j_x] - μ_hat_t[0])/q, -1],
-                        [0, 0, 0]])
+        Hti = np.array([[-(j_x - μ_hat_t[0])/math.sqrt(q), -(j_y - μ_hat_t[1])/math.sqrt(q), 0],
+                        [(j_y - μ_hat_t[1])/q, -(j_x - μ_hat_t[0])/q, -1],
+                        [0, 0, 0]]) # Jacobian
         
-        Sti = Hti @ Σ_hat_t @ np.transpose(Hti) + Qt
+        Sti = Hti @ Σ_hat_t @ np.transpose(Hti) + Qt # the uncertainty corresponding to the predicted measurement zˆit
 
-        Kti = Σ_hat_t @ np.transpose(Hti) @ np.linalg.inv(Sti)
+        Kti = Σ_hat_t @ np.transpose(Hti) @ np.linalg.inv(Sti) # Kalman gain
 
-        μ_hat_t = μ_hat_t + Kti @ (zti - z_hat_t_i)
+        μ_hat_t = μ_hat_t + Kti @ (zt[i] - z_hat_t_i)
 
         Σ_hat_t = (np.identity(3) - Kti @ Hti) @ Σ_hat_t
 
     μt = μ_hat_t
     Σt = Σ_hat_t
     
-    pzt = np.prod(np.linalg.det(2*np.pi * Sti)**(-1/2) * np.exp(-1/2 * np.transpose(zti - z_hat_t_i) @ np.linalg.inv(Sti) @ (zti - z_hat_t_i))) #Need to itterate over all i
+    #pzt = np.prod(np.linalg.det(2*np.pi * Sti)**(-1/2) * np.exp(-1/2 * np.transpose(zt[i] - z_hat_t_i) @ np.linalg.inv(Sti) @ (zt[i] - z_hat_t_i))) #Need to itterate over all i
+    pzt = 0
     return μt, Σt, pzt
+
+
+
+
+
+
+
+
 
 
 
