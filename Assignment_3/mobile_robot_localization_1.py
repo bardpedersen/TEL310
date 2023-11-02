@@ -138,6 +138,7 @@ def UKF_localization(μt_1, Σt_1, ut, zt, m):
     a1, a2, a3, a4 = None ##########
     sigma_r, sigma_phi, sigma_s = None ##########
 
+    # Generate augmented mean and covariance
     Mt = np.array([[a1*vt**2 + a2*wt**2, 0],
                     [0, a3*vt**2 + a4*wt**2]])
     
@@ -153,9 +154,33 @@ def UKF_localization(μt_1, Σt_1, ut, zt, m):
                             [0, 0, Qt]])
     
     gamma = None ##########
+
+    # Generate sigma points
     X_ta_1 = np.array([μ_hat_ta_1, μ_hat_ta_1 + gamma*np.sqrt(Σ_hat_ta_1), μ_hat_ta_1 - gamma*np.sqrt(Σ_hat_ta_1)])
 
+    # Propagate sigma points through motion model and compute gaussian statistics
     X_hat_tx = g(ut+X_tu, X_tx_1)
 
+    μ_hat_t = sum([Wm[i]*X_hat_tx[i] for i in range(2*3+1)]) # In range 2L ?
+
+    Σ_hat_t = sum([Wc[i]*(X_hat_tx[i] - μ_hat_t) @ np.transpose(X_hat_tx[i] - μ_hat_t) for i in range(2*3+1)]) # In range 2L ?
+
+    # Predicted observation at sigma point and compute gaussian statistics
+    Z_hat_t = h(X_hat_tx) + X_tz
+
+    z_hat_t = sum([Wm[i]*Z_hat_t[i] for i in range(2*3+1)]) # In range 2L ?
+
+    St = sum([Wc[i]*(Z_hat_t[i] - z_hat_t) @ np.transpose(Z_hat_t[i] - z_hat_t) for i in range(2*3+1)]) # In range 2L ?
+
+    Σ_hat_txz = sum([Wc[i]*(X_hat_tx[i] - μ_hat_t) @ np.transpose(Z_hat_t[i] - z_hat_t) for i in range(2*3+1)]) # In range 2L ?
+
+    # Update mean and covariance
+    Kt = Σ_hat_txz @ np.linalg.inv(St)
+
+    μt = μ_hat_t + Kt @ (zt - z_hat_t)
+
+    Σt = Σ_hat_t - Kt @ St @ np.transpose(Kt)
+
+    pzt = np.linalg.det(2*np.pi * St)**(-1/2) * np.exp(-1/2 * np.transpose(zt - z_hat_t) @ np.linalg.inv(St) @ (zt - z_hat_t))
 
     return μt, Σt, pzt
