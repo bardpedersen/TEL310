@@ -2,6 +2,7 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 import mobile_robot_localization_1 as mrl1
 
 
@@ -48,15 +49,100 @@ def plot_beams(xt, m, number_of_readings, z_maxlen, zt_start=np.pi/4, zt_end=-np
 
 
 def EKF_localization_known_correspondences_test():
-    time = 3
+    time = 4
     μt_1 = [8, 8, 0]
     μt_1_1 = μt_1.copy() # Create a copy of μt_1 for plotting true trajectory
     
-    Σt_1 = np.array([[0.1, 0, 0],
-                    [0, 0.1, 0],
-                    [0, 0, 0.1]])
-    alpha = [0.1, 0.01, 0.01, 0.1]
-    sigma = [0.1, 0.1, 0.1]
+    Σt_1 = np.array([[1, 0, 0],
+                    [0, 1, 0],
+                    [0, 0, 1]])
+    
+    alpha = [1, 1, 1, 1]
+    sigma = [1, 1, 1]
+
+    m = np.load('map/map_1.npy')
+    landmarks = [[0, 16, 0], [0, 12, 1], [0, 8, 2], [0, 4, 3], [0, 0, 4], 
+                [4, 0, 5], [8, 0, 6], [12, 0, 7], [16, 0, 8], 
+                [16, 4, 9], [16, 8, 10], [16, 12, 11], [16, 16, 12],
+                [12, 16, 13], [8, 16, 14], [4, 16, 15]] # [x, y, signature]
+    
+    fig, ax = plt.subplots()
+    ax.imshow(m, cmap='gray')
+    plot_landmarks = []
+    plot_estimated= []
+    plot_true = []
+    for i in landmarks:
+        plot_landmarks.append([i[0], i[1]])
+
+    u = np.array([[3, np.pi/4], 
+                [4, np.pi/4],
+                [4, np.pi/3],
+                [2, np.pi/2]]) # [vt, wt]
+    
+    c = np.array([[[16, 16, 12], [16, 12, 11], [16, 8, 10], [16, 4, 9], [16, 0, 8]],
+                [[16, 8, 10], [16, 4, 9], [16, 0, 8], [12, 0, 7]],
+                [[16, 0, 8], [12, 0, 7]],
+                [[12, 0, 7], [8, 0, 6], [4, 0, 5], [0, 0, 4], [0, 4, 3]]], dtype=object) # [[x, y, signature], ...]
+    
+    z = np.array([[[11, 0.78, 12], [9, 0.46, 11], [8, 0, 10], [9, -0.46, 9], [11, -0.78, 8]],
+                [[5, -0.78, 10], [6.4, -1.5, 9], [9.4, -1.8, 8], [8, -2.2, 7]],
+                [[5.6, -2.7, 8], [5.5, -3.5, 7]],
+                [[2, -5, 7], [5.9, -5.5, 6], [9.9, -5.6, 5], [13.8, -5.6, 4], [14.1, 0.32, 3]]], dtype=object) # [[rti, phiti, sti], ...]
+
+    for t in range(time):
+        delta_t = 1 # Time difference between t-1 and t
+        ut = u[t]
+        zt = z[t]
+        ct = c[t]
+
+        μt_1, Σt_1, pzt = mrl1.EKF_localization_known_correspondences(μt_1, Σt_1, ut, zt, ct, delta_t, alpha, sigma)
+        
+        # For plotting the mean value
+        plot_estimated.append([μt_1[0], μt_1[1]])
+                
+        # For plotting the uncertainty ellipse
+        circle = patches.Ellipse((μt_1[0], μt_1[1]), np.sqrt(Σt_1[0][0]), np.sqrt(Σt_1[1][1]), np.sqrt(Σt_1[2][2]), edgecolor='green') # Std from Σt_1 is the sqrt of the diagonal elements
+        ax.add_patch(circle)
+        print("pzt = ", pzt)
+
+        # For plotting true trajectory
+        plot_true.append([μt_1_1[0], μt_1_1[1]])
+
+        # For calculating rti, phiti
+        #for j in ct:
+        #    print(calculate_rti_phiti_sti(j[0], j[1], μt_1_1[0], μt_1_1[1], μt_1_1[2]))
+
+        μt_1_1[0] = μt_1_1[0] + ut[0] * delta_t * np.cos(μt_1_1[2])
+        μt_1_1[1] = μt_1_1[1] + ut[0] * delta_t * -np.sin(μt_1_1[2])
+        μt_1_1[2] = μt_1_1[2] + ut[1] * delta_t
+        
+        # PLotting beams, to know which landmarks the robot sees
+        #x_list, y_list, x_list_st, y_list_st = plot_beams(μt_1_1, m, 2, 16)
+        #ax.plot(x_list, y_list, 'b.')
+        #ax.plot(x_list_st, y_list_st, 'g.')
+
+    x_landmarks, y_landmarks = zip(*plot_landmarks)
+    x_estimated, y_estimated = zip(*plot_estimated)
+    x_true, y_true = zip(*plot_true)
+    ax.plot(x_landmarks, y_landmarks, 'ro', label='Landmarks')
+    ax.plot(x_true, y_true, 'bo', label='True trajectory')
+    ax.plot(x_estimated, y_estimated, 'go', label='Estimated trajectory')
+    ax.legend(bbox_to_anchor=(1.01, 1), loc='upper left')
+    ax.grid()
+    plt.show()
+
+
+def EKF_localization_test():
+    time = 4
+    μt_1 = [8, 8, 0]
+    μt_1_1 = μt_1.copy() # Create a copy of μt_1 for plotting true trajectory
+    
+    Σt_1 = np.array([[1, 0, 0],
+                    [0, 1, 0],
+                    [0, 0, 1]])
+    
+    alpha = [1, 1, 1, 1]
+    sigma = [1, 1, 1]
 
     m = np.load('map/map_1.npy')
     landmarks = [[0, 16, 0], [0, 12, 1], [0, 8, 2], [0, 4, 3], [0, 0, 4], 
@@ -65,74 +151,90 @@ def EKF_localization_known_correspondences_test():
                 [12, 16, 13], [8, 16, 14], [4, 16, 15]] # [x, y, signature]
     
     
-    plt.imshow(m, cmap='gray')
+    fig, ax = plt.subplots()
+    ax.imshow(m, cmap='gray')
     plot_landmarks = []
     plot_estimated= []
     plot_true = []
     for i in landmarks:
         plot_landmarks.append([i[0], i[1]])
 
-    """
-    Need to define better u, z, and c
-    """
-
     u = np.array([[3, np.pi/4], 
                 [4, np.pi/4],
-                [4, np.pi/3]]) # [vt, wt]
-    
-    c = np.array([[[16, 16, 12], [16, 12, 11], [16, 8, 10], [16, 4, 9], [16, 0, 8]],
-                [[16, 8, 10], [16, 4, 9], [16, 0, 8], [12, 0, 7]],
-                [[16, 0, 8], [12, 0, 7]]]) # [[x, y, signature], ...]
+                [4, np.pi/3],
+                [2, np.pi/2]]) # [vt, wt]
     
     z = np.array([[[11, 0.78, 12], [9, 0.46, 11], [8, 0, 10], [9, -0.46, 9], [11, -0.78, 8]],
                 [[5, -0.78, 10], [6.4, -1.5, 9], [9.4, -1.8, 8], [8, -2.2, 7]],
-                [[5.6, -2.7, 8], [5.5, -3.5, 7]]]) # [[rti, phiti, sti], ...]
+                [[5.6, -2.7, 8], [5.5, -3.5, 7]],
+                [[2, -5, 7], [5.9, -5.5, 6], [9.9, -5.6, 5], [13.8, -5.6, 4], [14.1, 0.32, 3]]], dtype=object) # [[rti, phiti, sti], ...]
 
     for t in range(time):
         delta_t = 1 # Time difference between t-1 and t
         ut = u[t]
         zt = z[t]
-        ct = c[t]
 
-        # For calculating rti, phiti, sti
-        #for j in ct:
-            #print(calculate_rti_phiti_sti(j[0], j[1], μt_1_1[0], μt_1_1[1], μt_1_1[2]))
-
-        μt_1, Σt_1, pzt = mrl1.EKF_localization_known_correspondences(μt_1, Σt_1, ut, zt, ct, delta_t, alpha, sigma)
+        μt_1, Σt_1 = mrl1.EKF_localization(μt_1, Σt_1, ut, zt, landmarks, delta_t, alpha, sigma)
         
+        # For plotting the mean value
+        plot_estimated.append([μt_1[0], μt_1[1]])
+                
+        # For plotting the uncertainty ellipse
+        circle = patches.Ellipse((μt_1[0], μt_1[1]), np.sqrt(Σt_1[0][0]), np.sqrt(Σt_1[1][1]), np.sqrt(Σt_1[2][2]), edgecolor='green') # Std from Σt_1 is the sqrt of the diagonal elements
+        ax.add_patch(circle)
+
         # For plotting true trajectory
         plot_true.append([μt_1_1[0], μt_1_1[1]])
 
-        # For plotting estimate trajectory
-        plot_estimated.append([μt_1[0], μt_1[1]])
-        
-        # PLotting beams
-        #x_list, y_list, x_list_st, y_list_st = plot_beams(μt_1_1, m, 2, 16)
-        #plt.plot(x_list, y_list, 'b.')
-        #plt.plot(x_list_st, y_list_st, 'g.')
-        
+        # For calculating rti, phiti
+        #for j in ct:
+        #    print(calculate_rti_phiti_sti(j[0], j[1], μt_1_1[0], μt_1_1[1], μt_1_1[2]))
+
         μt_1_1[0] = μt_1_1[0] + ut[0] * delta_t * np.cos(μt_1_1[2])
         μt_1_1[1] = μt_1_1[1] + ut[0] * delta_t * -np.sin(μt_1_1[2])
         μt_1_1[2] = μt_1_1[2] + ut[1] * delta_t
-
-        #print("Σt_1 = ", Σt_1)
-        #print("pzt = ", 0)
+        
+        # PLotting beams, to know which landmarks the robot sees
+        #x_list, y_list, x_list_st, y_list_st = plot_beams(μt_1_1, m, 2, 16)
+        #ax.plot(x_list, y_list, 'b.')
+        #ax.plot(x_list_st, y_list_st, 'g.')
 
     x_landmarks, y_landmarks = zip(*plot_landmarks)
     x_estimated, y_estimated = zip(*plot_estimated)
     x_true, y_true = zip(*plot_true)
-    plt.plot(x_landmarks, y_landmarks, 'ro', label='Landmarks')
-    plt.plot(x_true, y_true, 'bo', label='True trajectory')
-    plt.plot(x_estimated, y_estimated, 'go', label='Estimated trajectory')
-    plt.legend(bbox_to_anchor=(1.01, 1), loc='upper left')
+    ax.plot(x_landmarks, y_landmarks, 'ro', label='Landmarks')
+    ax.plot(x_true, y_true, 'bo', label='True trajectory')
+    ax.plot(x_estimated, y_estimated, 'go', label='Estimated trajectory')
+    ax.legend(bbox_to_anchor=(1.01, 1), loc='upper left')
+    ax.grid()
     plt.show()
 
 
+def UKF_localization_test():
+    μt_1 = [8, 8, 0]
+    Σt_1 = np.array([[1, 0, 0],
+                    [0, 1, 0],
+                    [0, 0, 1]])
+    alpha = [1, 1, 1, 1]
+    sigma = [1, 1, 1]
 
+    u = np.array([[3, np.pi/4], 
+                [4, np.pi/4],
+                [4, np.pi/3],
+                [2, np.pi/2]]) # [vt, wt]
+    
+    z = np.array([[[11, 0.78, 12], [9, 0.46, 11], [8, 0, 10], [9, -0.46, 9], [11, -0.78, 8]],
+                [[5, -0.78, 10], [6.4, -1.5, 9], [9.4, -1.8, 8], [8, -2.2, 7]],
+                [[5.6, -2.7, 8], [5.5, -3.5, 7]],
+                [[2, -5, 7], [5.9, -5.5, 6], [9.9, -5.6, 5], [13.8, -5.6, 4], [14.1, 0.32, 3]]], dtype=object) # [[rti, phiti, sti], ...]
 
-
+    for t in range(4):
+        ut = u[t]
+        zt = z[t]
+        mrl1.UKF_localization(μt_1, Σt_1, ut, zt, alpha, sigma)
 
 if __name__ == '__main__':
-    EKF_localization_known_correspondences_test()
-
+    #EKF_localization_known_correspondences_test()
+    #EKF_localization_test()
+    UKF_localization_test()
     
