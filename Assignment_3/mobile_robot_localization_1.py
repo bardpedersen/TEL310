@@ -206,17 +206,17 @@ def UKF_localization(μt_1, Σt_1, ut, zt, alpha, sigma):
     Qt = np.array([[sigma_r**2, 0],
                     [0, sigma_phi**2]])
     
-    μ_hat_ta_1 = np.transpose(np.array(μt_1).T,  ########################
-                          np.array([0, 0]).T, 
-                          np.array([0, 0]).T)
+    μ_hat_ta_1 = np.array([[μt_1[0],μt_1[1],μt_1[2]],
+                           [0, 0, 0],
+                           [0, 0, 0]])
     
     Σ_hat_ta_1 = np.block([[Σt_1, np.zeros((Σt_1.shape[0], Mt.shape[1])), np.zeros((Σt_1.shape[0], Qt.shape[1]))],
                        [np.zeros((Mt.shape[0], Σt_1.shape[1])), Mt, np.zeros((Mt.shape[0], Qt.shape[1]))],
                        [np.zeros((Qt.shape[0], Σt_1.shape[1])), np.zeros((Qt.shape[0], Mt.shape[1])), Qt]])
     
     # Generate Weights
-    alpha = 1 # Scaling parameters
-    k = 1 # Scaling parameters
+    alpha = 10e-3 # Scaling parameters
+    k = 0 # Scaling parameters
     beta = 2 # if the distribution is Gaussian, beta = 2 is optimal
     Wm = []
     Wc = []
@@ -225,7 +225,7 @@ def UKF_localization(μt_1, Σt_1, ut, zt, alpha, sigma):
     gamma = math.sqrt(L + lambda_)
     for i in range(2*L):
         if i == 0:
-            Wm.appned(lambda_/(0 + lambda_))
+            Wm.append(lambda_/(0 + lambda_))
             Wc.append(lambda_/(0 + lambda_) + (1 - alpha**2 + beta))
         Wm.append(1 / (2*(i + lambda_)))
         Wc.append(1 / (2*(i + lambda_)))
@@ -237,7 +237,7 @@ def UKF_localization(μt_1, Σt_1, ut, zt, alpha, sigma):
     X_tz = np.linalg.transpose(X_ta_1[2]) # From 7.28
 
     # Predicton of sigma points
-    X_hat_tx = g(ut+X_tu, X_tx_1) # nonlinear function ########################
+    X_hat_tx = ut+X_tu, X_tx_1 #g(ut+X_tu, X_tx_1) # nonlinear function ########################
 
     # Predicted mean
     μ_hat_t = sum([Wm[i]*X_hat_tx[i] for i in range(2*L)]) # In range 2L ?
@@ -246,7 +246,7 @@ def UKF_localization(μt_1, Σt_1, ut, zt, alpha, sigma):
     Σ_hat_t = sum([Wc[i]* (X_hat_tx[i] - μ_hat_t) @ np.transpose(X_hat_tx[i] - μ_hat_t) for i in range(2*L)])
 
     # Measurement sigma points
-    Z_hat_t = h(X_hat_tx) + X_tz ########################
+    Z_hat_t = X_hat_tx + X_tz # h(X_hat_tx) + X_tz ########################
 
     # Predicted measurement mean
     z_hat_t = sum([Wm[i]*Z_hat_t[i] for i in range(2*L)])
