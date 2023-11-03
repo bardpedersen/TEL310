@@ -190,11 +190,58 @@ def EKF_localization(μt_1, Σt_1, ut, zt, landmarks, delta_t, alpha, sigma):
     return μt, Σt
 
 
+def g(ut, Xt):
+    # This calculation is based on time step = one
+    Xt[0] = Xt[0] + ut[0] * np.cos(Xt[2])
+    Xt[1] = Xt[1] + ut[0] * -np.sin(Xt[2])
+    Xt[2] = Xt[2] + ut[1]
+    return Xt
+
+def h(Xt, landmarks):
+    # Asumes that the robot have a reading from pi/4 to - pi/4
+    # whn in position Xt, with landmarks in positions m1, m2, ..., mn, the expected measurements are z1, z2, ..., zn
+    xt_list = []
+    zt_start = -np.pi/4
+    zt_end = np.pi/4
+    z_maxlen = 400 # Max range of the lidar
+
+    x, y, theta = Xt # x, y, θ (robot pose)
+    angle_inc = np.linspace(zt_start, zt_end, 2) # For lidar
+
+    for angle in angle_inc:
+        for i in range(int(z_maxlen)): # For every block in the map up to the max range
+            m_x = x + i * np.cos(angle + theta) 
+            m_y = y + i * -np.sin(angle + theta) # -sin is only nessasary when the map is wrong // else sin
+            if round(m_x) == 0 or round(m_y) == 0 or round(m_x) == 16 or round(m_y) == 16: # If the block is outside the map
+                break
+        if not (round(m_x) < 0 or round(m_y) < 0 or round(m_x) > 16 or round(m_y) > 16):
+            xt_list.append([round(m_x), round(m_y)])
+
+    # check which landmarks are in the range of the lidar
+    Zt = []
+    for c in landmarks:
+        if xt_list[0][0] <= c[0] <= xt_list[1][0]and xt_list[0][0] <= xt_list[1][0]:
+            if xt_list[0][1] <= c[1] <= xt_list[1][1] and xt_list[0][1] <= xt_list[1][1]:
+                Zt.append(c)
+                continue
+            if xt_list[1][1] <= c[1] <= xt_list[0][1] and xt_list[1][1] <= xt_list[0][1]:
+                Zt.append(c)
+                continue
+        if xt_list[1][0] <= c[0] <= xt_list[0][0]and xt_list[1][0] <= xt_list[0][0]:
+            if xt_list[0][1] <= c[1] <= xt_list[1][1] and xt_list[0][1] <= xt_list[1][1]:
+                Zt.append(c)
+                continue
+            if xt_list[1][1] <= c[1] <= xt_list[0][1] and xt_list[1][1] <= xt_list[0][1]:
+                Zt.append(c)
+                continue
+    return Zt
+
+
 """
 Algorithm for calculating the robot pose at time t, with a mean and a standar deviation, using the Unscented Kalman Filter.
 
 """
-def UKF_localization(μt_1, Σt_1, ut, zt, alpha, sigma):
+def UKF_localization(μt_1, Σt_1, ut, zt, alpha, sigma, landmarks):
     vt, wt = ut
     a1, a2, a3, a4 = alpha
     sigma_r, sigma_phi, sigma_s = sigma
@@ -237,7 +284,7 @@ def UKF_localization(μt_1, Σt_1, ut, zt, alpha, sigma):
     X_tz = np.linalg.transpose(X_ta_1[2]) # From 7.28
 
     # Predicton of sigma points
-    X_hat_tx = ut+X_tu, X_tx_1 #g(ut+X_tu, X_tx_1) # nonlinear function ########################
+    X_hat_tx = g(ut+X_tu, X_tx_1)
 
     # Predicted mean
     μ_hat_t = sum([Wm[i]*X_hat_tx[i] for i in range(2*L)]) # In range 2L ?
@@ -246,7 +293,7 @@ def UKF_localization(μt_1, Σt_1, ut, zt, alpha, sigma):
     Σ_hat_t = sum([Wc[i]* (X_hat_tx[i] - μ_hat_t) @ np.transpose(X_hat_tx[i] - μ_hat_t) for i in range(2*L)])
 
     # Measurement sigma points
-    Z_hat_t = X_hat_tx + X_tz # h(X_hat_tx) + X_tz ########################
+    Z_hat_t = h(X_hat_tx, landmarks) + X_tz ########################
 
     # Predicted measurement mean
     z_hat_t = sum([Wm[i]*Z_hat_t[i] for i in range(2*L)])
