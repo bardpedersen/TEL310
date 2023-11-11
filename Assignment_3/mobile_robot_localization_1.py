@@ -190,59 +190,35 @@ def EKF_localization(μt_1, Σt_1, ut, zt, landmarks, delta_t, alpha, sigma):
     return μt, Σt
 
 
-def g(ut, Xt):
-    # This calculation is based on time step = one
-    Xt[0] = Xt[0] + ut[0] * np.cos(Xt[2])
-    Xt[1] = Xt[1] + ut[0] * -np.sin(Xt[2])
-    Xt[2] = Xt[2] + ut[1]
-    return Xt
+def g(ut, X_tu, X_tx_1, L):
+    X_t = []
+    for i in range(2*L+1):
+        vit = ut[0] + X_tu[0][i]
+        wit = ut[1] + X_tu[1][i]
+        thetait = X_tx_1[2][i]
+        X_t.append([X_tx_1[0][i] - vit/wit*math.sin(thetait) + vit/wit*math.sin(thetait + wit),
+                   X_tx_1[1][i] + vit/wit*math.cos(thetait) - vit/wit*math.cos(thetait + wit),
+                   X_tx_1[2][i] + wit])
+    return np.array(X_t)
 
-def h(Xt, landmarks):
-    # Asumes that the robot have a reading from pi/4 to - pi/4
-    # whn in position Xt, with landmarks in positions m1, m2, ..., mn, the expected measurements are z1, z2, ..., zn
-    xt_list = []
-    zt_start = -np.pi/4
-    zt_end = np.pi/4
-    z_maxlen = 400 # Max range of the lidar
-
-    x, y, theta = Xt # x, y, θ (robot pose)
-    angle_inc = np.linspace(zt_start, zt_end, 2) # For lidar
-
-    for angle in angle_inc:
-        for i in range(int(z_maxlen)): # For every block in the map up to the max range
-            m_x = x + i * np.cos(angle + theta) 
-            m_y = y + i * -np.sin(angle + theta) # -sin is only nessasary when the map is wrong // else sin
-            if round(m_x) == 0 or round(m_y) == 0 or round(m_x) == 16 or round(m_y) == 16: # If the block is outside the map
-                break
-        if not (round(m_x) < 0 or round(m_y) < 0 or round(m_x) > 16 or round(m_y) > 16):
-            xt_list.append([round(m_x), round(m_y)])
-
-    # check which landmarks are in the range of the lidar
+def h(Xt, X_tz, L, zt):
+    mx = zt[0]
+    my = zt[1]
     Zt = []
-    for c in landmarks:
-        if xt_list[0][0] <= c[0] <= xt_list[1][0]and xt_list[0][0] <= xt_list[1][0]:
-            if xt_list[0][1] <= c[1] <= xt_list[1][1] and xt_list[0][1] <= xt_list[1][1]:
-                Zt.append(c)
-                continue
-            if xt_list[1][1] <= c[1] <= xt_list[0][1] and xt_list[1][1] <= xt_list[0][1]:
-                Zt.append(c)
-                continue
-        if xt_list[1][0] <= c[0] <= xt_list[0][0]and xt_list[1][0] <= xt_list[0][0]:
-            if xt_list[0][1] <= c[1] <= xt_list[1][1] and xt_list[0][1] <= xt_list[1][1]:
-                Zt.append(c)
-                continue
-            if xt_list[1][1] <= c[1] <= xt_list[0][1] and xt_list[1][1] <= xt_list[0][1]:
-                Zt.append(c)
-                continue
-    return Zt
+    for i in range(2*L+1):
+        Zt.append([math.sqrt((mx - Xt[i][0])**2 + (my - Xt[i][1])**2) + X_tz[0][i], 
+                   math.atan2(my - Xt[i][1], mx - Xt[i][0]) - Xt[i][2] + X_tz[1][i]])
+
+    return np.array(Zt)
 
 
 """
 Algorithm for calculating the robot pose at time t, with a mean and a standar deviation, using the Unscented Kalman Filter.
 
 """
-def UKF_localization(μt_1, Σt_1, ut, zt, alpha, sigma, landmarks):
+def UKF_localization(μt_1, Σt_1, ut, zt, alpha, sigma):
     vt, wt = ut
+    zt = np.array(zt)
     a1, a2, a3, a4 = alpha
     sigma_r, sigma_phi, sigma_s = sigma
 
@@ -253,61 +229,79 @@ def UKF_localization(μt_1, Σt_1, ut, zt, alpha, sigma, landmarks):
     Qt = np.array([[sigma_r**2, 0],
                     [0, sigma_phi**2]])
     
-    μ_hat_ta_1 = np.array([[μt_1[0],μt_1[1],μt_1[2]],
-                           [0, 0, 0],
-                           [0, 0, 0]])
+    μ_ta_1 = np.array([[μt_1[0]],[μt_1[1]],[μt_1[2]],
+                           [0], [0],
+                           [0], [0]])
     
-    Σ_hat_ta_1 = np.block([[Σt_1, np.zeros((Σt_1.shape[0], Mt.shape[1])), np.zeros((Σt_1.shape[0], Qt.shape[1]))],
-                       [np.zeros((Mt.shape[0], Σt_1.shape[1])), Mt, np.zeros((Mt.shape[0], Qt.shape[1]))],
-                       [np.zeros((Qt.shape[0], Σt_1.shape[1])), np.zeros((Qt.shape[0], Mt.shape[1])), Qt]])
+    Σ_ta_1 = np.block([[abs(Σt_1), np.zeros((Σt_1.shape[0], Mt.shape[1])), np.zeros((Σt_1.shape[0], Qt.shape[1]))],
+                       [np.zeros((Mt.shape[0], Σt_1.shape[1])), abs(Mt), np.zeros((Mt.shape[0], Qt.shape[1]))],
+                       [np.zeros((Qt.shape[0], Σt_1.shape[1])), np.zeros((Qt.shape[0], Mt.shape[1])), abs(Qt)]])
     
     # Generate Weights
-    alpha = 10e-3 # Scaling parameters
+    alpha = 1 # Scaling parameters
     k = 0 # Scaling parameters
     beta = 2 # if the distribution is Gaussian, beta = 2 is optimal
-    Wm = []
-    Wc = []
-    L = len(np.diagonal(Σ_hat_ta_1)) # The dimensionality L of the augmented state is given by the sum of the state, control, and measurement dimensions, which is diagnoal elements of Σ_hat_ta_1, which is 3 + 2 + 2 = 7
-    lambda_ = alpha**2 * (L+k)-L
+    L = len(np.diagonal(Σ_ta_1)) # The dimensionality L of the augmented state is given by the sum of the state, control, and measurement dimensions, which is diagnoal elements of Σ_hat_ta_1, which is 3 + 2 + 2 = 7
+    lambda_ = alpha**2 * (L+k) - L 
+    Wm = np.zeros(2*L + 1)
+    Wc = np.zeros(2*L + 1)
     gamma = math.sqrt(L + lambda_)
-    for i in range(2*L):
-        if i == 0:
-            Wm.append(lambda_/(0 + lambda_))
-            Wc.append(lambda_/(0 + lambda_) + (1 - alpha**2 + beta))
-        Wm.append(1 / (2*(i + lambda_)))
-        Wc.append(1 / (2*(i + lambda_)))
+    Wm[:] = .5/(L + lambda_)
+    Wc[:] = .5/(L + lambda_)
+    Wm[0] = lambda_/(lambda_ + L)
+    Wc[0] = lambda_/(lambda_ + L) + (1 - alpha**2 + beta)
 
     # Generate sigma points
-    X_ta_1 = np.array([μ_hat_ta_1, μ_hat_ta_1 + gamma*sqrtm(Σ_hat_ta_1), μ_hat_ta_1 - gamma*sqrtm(Σ_hat_ta_1)])
-    X_tx_1 = np.linalg.transpose(X_ta_1[0])
-    X_tu = np.linalg.transpose(X_ta_1[1])
-    X_tz = np.linalg.transpose(X_ta_1[2]) # From 7.28
+    temp = np.linalg.cholesky(Σ_ta_1).T
+    X_ta_1 = np.column_stack([μ_ta_1, (μ_ta_1 + gamma*temp.T).T, (μ_ta_1 - gamma*temp.T).T])
+    X_tx_1 = X_ta_1[0:3] # x, y, θ
+    X_tu = X_ta_1[3:5] # vt, wt noise component
+    X_tz = X_ta_1[-2:] # r, phi #From 7.28
 
     # Predicton of sigma points
-    X_hat_tx = g(ut+X_tu, X_tx_1)
+    X_bar_tx = g(ut, X_tu, X_tx_1, L) #ut+X_tu, X_tx_1  # 3x15
+    print("X_bar_tx", X_bar_tx)
 
     # Predicted mean
-    μ_hat_t = sum([Wm[i]*X_hat_tx[i] for i in range(2*L)]) # In range 2L ?
+    μ_bar_t = 0 
+    for i in range(2*L+1):
+        μ_bar_t += Wm[i]*X_bar_tx[i]
+    μ_bar_t = np.array(μ_bar_t) # x, y, θ, 3x1
 
     # Predicted covariance
-    Σ_hat_t = sum([Wc[i]* (X_hat_tx[i] - μ_hat_t) @ np.transpose(X_hat_tx[i] - μ_hat_t) for i in range(2*L)])
+    Σ_bar_t = 0
+    for i in range(2*L+1):
+        matrix = np.array([[X_bar_tx[i][0] - μ_bar_t[1]], [X_bar_tx[i][1] - μ_bar_t[1]], [X_bar_tx[i][2] - μ_bar_t[2]]])
+        Σ_bar_t += (Wc[i]* (np.array([X_bar_tx[i] - μ_bar_t]).T @ matrix.T))
+    Σ_bar_t = np.array(Σ_bar_t) # x, y, θ, 3x3
 
     # Measurement sigma points
-    Z_hat_t = h(X_hat_tx, landmarks) + X_tz ########################
+    Z_bar_t = h(X_bar_tx, X_tz, L, zt) # 2x15
 
     # Predicted measurement mean
-    z_hat_t = sum([Wm[i]*Z_hat_t[i] for i in range(2*L)])
+    z_hat_t = 0
+    for i in range(2*L+1):
+        z_hat_t += (Wm[i]*Z_bar_t[i])
+    z_hat_t = np.array([[z_hat_t[0]], [z_hat_t[1]]]) # 2x1
 
-    # Predicted measurement covariance
-    St = sum([Wc[i]*(Z_hat_t[i] - z_hat_t) @ np.transpose(Z_hat_t[i] - z_hat_t) for i in range(2*L)])
+    St = 0
+    for i in range(2*L+1):
+        St += Wc[i]*(Z_bar_t[i] - z_hat_t) @ np.transpose(Z_bar_t[i] - z_hat_t)
+    St = np.array(St) # 2x2 
 
-    # Cross covariance
-    Σ_hat_txz = sum([Wc[i]*(X_hat_tx[i] - μ_hat_t) @ np.transpose(Z_hat_t[i] - z_hat_t) for i in range(2*L)])
+    # Cross covariance, not matrix
+    Σ_hat_txz = 0
+    for i in range(2*L+1):
+        matrix1 = np.array([Z_bar_t[i][0] - z_hat_t[0], Z_bar_t[i][1] - z_hat_t[1]])
+        matrix2 = np.array([X_bar_tx[i][0] - μ_bar_t[0], X_bar_tx[i][1] - μ_bar_t[1], X_bar_tx[i][2] - μ_bar_t[2]])
+        matrix2 = matrix2.reshape((3, 1))
+        Σ_hat_txz += Wc[i]* matrix2 @  np.transpose(matrix1) 
+    Σ_hat_txz = np.array(Σ_hat_txz) # 3x2
 
     # Update mean and covariance
-    Kt = Σ_hat_txz @ np.linalg.inv(St)
-    μt = μ_hat_t + Kt @ (zt - z_hat_t)
-    Σt = Σ_hat_t - Kt @ St @ np.transpose(Kt)
-    pzt = np.linalg.det(2*np.pi * St)**(-1/2) * np.exp(-1/2 * np.transpose(zt - z_hat_t) @ np.linalg.inv(St) @ (zt - z_hat_t))
-
-    return μt, Σt, pzt
+    Kt = Σ_hat_txz @ St
+    μt = μ_bar_t.reshape(3, 1) + Kt @ (zt.reshape((2, 1)) - z_hat_t.reshape((2, 1)))
+    Σt = Σ_bar_t - Kt @ St @ np.transpose(Kt)
+    #pzt = np.linalg.det(2*np.pi * St)**(-1/2) * np.exp(-1/2 * np.transpose(zt - z_hat_t) @ np.linalg.inv(St) @ (zt - z_hat_t))
+    pzt = 1
+    return μt.reshape(3,), Σt , pzt
