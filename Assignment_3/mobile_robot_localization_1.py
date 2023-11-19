@@ -233,18 +233,18 @@ def UKF_localization(μt_1, Σt_1, ut, zt, alpha, sigma):
                            [0], [0],
                            [0], [0]])
     
-    Σ_ta_1 = np.block([[abs(Σt_1), np.zeros((Σt_1.shape[0], Mt.shape[1])), np.zeros((Σt_1.shape[0], Qt.shape[1]))],
-                       [np.zeros((Mt.shape[0], Σt_1.shape[1])), abs(Mt), np.zeros((Mt.shape[0], Qt.shape[1]))],
-                       [np.zeros((Qt.shape[0], Σt_1.shape[1])), np.zeros((Qt.shape[0], Mt.shape[1])), abs(Qt)]])
+    Σ_ta_1 = np.block([[(Σt_1), np.zeros((Σt_1.shape[0], Mt.shape[1])), np.zeros((Σt_1.shape[0], Qt.shape[1]))],
+                       [np.zeros((Mt.shape[0], Σt_1.shape[1])), (Mt), np.zeros((Mt.shape[0], Qt.shape[1]))],
+                       [np.zeros((Qt.shape[0], Σt_1.shape[1])), np.zeros((Qt.shape[0], Mt.shape[1])), (Qt)]])
     
     # Generate Weights
-    alpha = 1 # Scaling parameters
-    k = 0 # Scaling parameters
+    alpha = 0.5 # Scaling parameters
+    k = 3 # Scaling parameters
     beta = 2 # if the distribution is Gaussian, beta = 2 is optimal
     L = len(np.diagonal(Σ_ta_1)) # The dimensionality L of the augmented state is given by the sum of the state, control, and measurement dimensions, which is diagnoal elements of Σ_hat_ta_1, which is 3 + 2 + 2 = 7
     lambda_ = alpha**2 * (L+k) - L 
-    Wm = np.zeros(2*L + 1)
-    Wc = np.zeros(2*L + 1)
+    Wm = np.zeros(2*L)
+    Wc = np.zeros(2*L)
     gamma = math.sqrt(L + lambda_)
     Wm[:] = .5/(L + lambda_)
     Wc[:] = .5/(L + lambda_)
@@ -254,6 +254,8 @@ def UKF_localization(μt_1, Σt_1, ut, zt, alpha, sigma):
     # Generate sigma points
     temp = np.linalg.cholesky(Σ_ta_1).T
     X_ta_1 = np.column_stack([μ_ta_1, (μ_ta_1 + gamma*temp.T).T, (μ_ta_1 - gamma*temp.T).T])
+    print("X_ta_1", X_ta_1.shape)
+    X_ta_1 = np.zeros((7, 15))
     X_tx_1 = X_ta_1[0:3] # x, y, θ
     X_tu = X_ta_1[3:5] # vt, wt noise component
     X_tz = X_ta_1[-2:] # r, phi #From 7.28
@@ -264,44 +266,50 @@ def UKF_localization(μt_1, Σt_1, ut, zt, alpha, sigma):
 
     # Predicted mean
     μ_bar_t = 0 
-    for i in range(2*L+1):
+    for i in range(2*L):
         μ_bar_t += Wm[i]*X_bar_tx[i]
     μ_bar_t = np.array(μ_bar_t) # x, y, θ, 3x1
+    print("μ_bar_t", μ_bar_t)
 
     # Predicted covariance
     Σ_bar_t = 0
-    for i in range(2*L+1):
+    for i in range(2*L):
         matrix = np.array([[X_bar_tx[i][0] - μ_bar_t[1]], [X_bar_tx[i][1] - μ_bar_t[1]], [X_bar_tx[i][2] - μ_bar_t[2]]])
         Σ_bar_t += (Wc[i]* (np.array([X_bar_tx[i] - μ_bar_t]).T @ matrix.T))
     Σ_bar_t = np.array(Σ_bar_t) # x, y, θ, 3x3
+    print("Σ_bar_t", Σ_bar_t)
 
     # Measurement sigma points
     Z_bar_t = h(X_bar_tx, X_tz, L, zt) # 2x15
+    print("Z_bar_t", Z_bar_t)
 
     # Predicted measurement mean
     z_hat_t = 0
-    for i in range(2*L+1):
+    for i in range(2*L):
         z_hat_t += (Wm[i]*Z_bar_t[i])
     z_hat_t = np.array([[z_hat_t[0]], [z_hat_t[1]]]) # 2x1
+    print("z_hat_t", z_hat_t)
 
     St = 0
-    for i in range(2*L+1):
+    for i in range(2*L):
         St += Wc[i]*(Z_bar_t[i] - z_hat_t) @ np.transpose(Z_bar_t[i] - z_hat_t)
     St = np.array(St) # 2x2 
+    print("St", St)
 
     # Cross covariance, not matrix
     Σ_hat_txz = 0
-    for i in range(2*L+1):
+    for i in range(2*L):
         matrix1 = np.array([Z_bar_t[i][0] - z_hat_t[0], Z_bar_t[i][1] - z_hat_t[1]])
         matrix2 = np.array([X_bar_tx[i][0] - μ_bar_t[0], X_bar_tx[i][1] - μ_bar_t[1], X_bar_tx[i][2] - μ_bar_t[2]])
         matrix2 = matrix2.reshape((3, 1))
         Σ_hat_txz += Wc[i]* matrix2 @  np.transpose(matrix1) 
     Σ_hat_txz = np.array(Σ_hat_txz) # 3x2
+    print("Σ_hat_txz", Σ_hat_txz)
 
     # Update mean and covariance
     Kt = Σ_hat_txz @ St
     μt = μ_bar_t.reshape(3, 1) + Kt @ (zt.reshape((2, 1)) - z_hat_t.reshape((2, 1)))
     Σt = Σ_bar_t - Kt @ St @ np.transpose(Kt)
-    #pzt = np.linalg.det(2*np.pi * St)**(-1/2) * np.exp(-1/2 * np.transpose(zt - z_hat_t) @ np.linalg.inv(St) @ (zt - z_hat_t))
-    pzt = 1
+    #pzt = np.linalg.det(2*np.pi * St)**(-1/2) * np.exp(-1/2 * np.transpose(zt.reshape((2, 1)) - z_hat_t.reshape((2, 1))) @ np.linalg.inv(St) @ (zt.reshape((2, 1)) - z_hat_t.reshape((2, 1))))
+    pzt = 0
     return μt.reshape(3,), Σt , pzt

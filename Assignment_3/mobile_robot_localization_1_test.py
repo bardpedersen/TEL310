@@ -211,17 +211,6 @@ def EKF_localization_test():
 
 
 def UKF_localization_test():
-    time = 4
-    μt_1 = [8, 8, 0]
-    μt_1_1 = μt_1.copy() # Create a copy of μt_1 for plotting true trajectory
-    
-    Σt_1 = np.array([[1, 0, 0],
-                    [0, 1, 0],
-                    [0, 0, 1]])
-    
-    alpha = [1e-3, 1e-3, 1e-3, 1e-3]
-    sigma = [1e-3, 1e-3, 1e-3]
-
     m = np.load('map/map_1.npy')
     landmarks = [[0, 16, 0], [0, 12, 1], [0, 8, 2], [0, 4, 3], [0, 0, 4], 
                 [4, 0, 5], [8, 0, 6], [12, 0, 7], [16, 0, 8], 
@@ -237,17 +226,21 @@ def UKF_localization_test():
     for i in landmarks:
         plot_landmarks.append([i[0], i[1]])
 
+    time = 4
+    μt_1 = [8, 8, 0]
+    μt_1_1 = μt_1.copy() # Create a copy of μt_1 for plotting true trajectory
+    Σt_1 = np.array([[0.001, 0, 0],
+                    [0, 0.001, 0],
+                    [0, 0, 0.001]])
+    
+    alpha = [1, 1, 1, 1]
+    sigma = [1, 1, 1]
+
     u = np.array([[3, np.pi/4], 
                 [4, np.pi/4],
                 [4, np.pi/3],
                 [2, np.pi/2]]) # [vt, wt]
     
-    """
-    z = np.array([[[11, 0.78, 12], [9, 0.46, 11], [8, 0, 10], [9, -0.46, 9], [11, -0.78, 8]],
-                [[5, -0.78, 10], [6.4, -1.5, 9], [9.4, -1.8, 8], [8, -2.2, 7]],
-                [[5.6, -2.7, 8], [5.5, -3.5, 7]],
-                [[2, -5, 7], [5.9, -5.5, 6], [9.9, -5.6, 5], [13.8, -5.6, 4], [14.1, 0.32, 3]]], dtype=object) # [[rti, phiti, sti], ...]
-    """
     z = np.array([[11, 0.78],
                 [5, -0.78],
                 [5.6, -2.7],
@@ -263,6 +256,8 @@ def UKF_localization_test():
         print(μt_1)
         print('-'*30)
         print(Σt_1)
+        print('-'*30)
+        print(pzt)
         # For plotting the uncertainty ellipse
         circle = patches.Ellipse((μt_1[0], μt_1[1]), np.sqrt(Σt_1[0][0]), np.sqrt(Σt_1[1][1]), np.sqrt(Σt_1[2][2]), edgecolor='green') # Std from Σt_1 is the sqrt of the diagonal elements
         ax.add_patch(circle)
