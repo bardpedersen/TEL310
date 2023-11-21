@@ -6,22 +6,38 @@ import sensor_model as sm
 
 
 
-def Grid_localization(pkt_1, ut, zt, m):
+def Grid_localization(pkt_1, ut, zt, m, delta_t, alpha, Theta, z_maxlen):
     """
     pkt_1 = how you want the grid to look like at time t-1
-
-
-    xt = robot pose
-    xt_1 = robot pose at time t-1
     ut = control input
     zt = sensor measurement
     m = map
-
+    xt = robot pose
+    xt_1 = robot pose at time t-1
+    delta_t = time step
+    alpha = motion error parameters
+    Theta = sensor model parameters
+    z_maxlen = maximum sensor range
     """
-    for i in range(len(pkt_1)) #itter thru all cells
-        p_bar_kt = pkt_1[i] * mm.motion_model_velocity(xt, ut, xt_1, delta_t, alpha)
-        p_kt = n * p_bar_kt * sm.beam_range_finder_model(zt, xt, m, Theta, z_maxlen, zt_start=0, zt_end=2*np.pi, transpose=True)
-        
+    
+    n = 1
+    size_y = m.shape[0]/pkt_1.shape[0]
+    size_x = m.shape[1]/pkt_1.shape[1]
+    xk = [size_x, size_y, np.pi/2] 
+    xi = [size_x-ut[0]-1, size_y-1, np.pi/2] 
+    p_kt = np.zeros(pkt_1.shape)
+    for x in range(pkt_1.shape[0]-1):
+        for y in range(pkt_1.shape[1]-1):
+            p_bar_kt = pkt_1[x][y] * mm.motion_model_velocity(xk, ut, xi, delta_t, alpha)
+            print('mm: ',mm.motion_model_velocity(xk, ut, xi, delta_t, alpha))
+            p_kt[x][y] = n * p_bar_kt * sm.beam_range_finder_model(zt, xk, m, Theta, z_maxlen, zt_start=0, zt_end=2*np.pi, transpose=True)
+            xk[1] += size_y
+            xi[1] += size_y
+        xi[0] += size_x
+        xk[0] += size_x
+        xk[1] = 0
+        xi[1] = 0
+
     return p_kt
 
 
