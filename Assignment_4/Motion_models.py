@@ -38,7 +38,7 @@ def motion_model_velocity(x_t, u_t, x_t_1, delta_t, alpha):
     p1 = prob_normal_distribution(v - hat_v, alpha1*v**2 + alpha2*w**2)
     p2 = prob_normal_distribution(w - hat_omega, alpha3*v**2 + alpha4*w**2)
     p3 = prob_normal_distribution(hat_gamma - theta, alpha5*v**2 + alpha6*w**2)
-    return p1 * p2 * p3 # p(x_t|x_t_1, u_t)
+    return p2 * p3 #p1 # p(x_t|x_t_1, u_t)
 
 
 """
