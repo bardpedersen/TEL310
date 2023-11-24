@@ -129,7 +129,7 @@ def EKF_localization_known_correspondences_test():
     ax.plot(x_estimated, y_estimated, 'go', label='Estimated trajectory')
     ax.legend(bbox_to_anchor=(1.01, 1), loc='upper left')
     ax.grid()
-    plt.show()
+    plt.savefig('images/EKF_localization_known_correspondences_test.png')
 
 
 def EKF_localization_test():
@@ -207,7 +207,7 @@ def EKF_localization_test():
     ax.plot(x_estimated, y_estimated, 'go', label='Estimated trajectory')
     ax.legend(bbox_to_anchor=(1.01, 1), loc='upper left')
     ax.grid()
-    plt.show()
+    plt.savefig('images/EKF_localization_test.png')
 
 
 def UKF_localization_test():
@@ -236,17 +236,11 @@ def UKF_localization_test():
     alpha = [1, 1, 1, 1]
     sigma = [1, 1, 1]
 
-    u = np.array([[3, np.pi/4], 
-                [4, np.pi/4],
-                [4, np.pi/3],
-                [2, np.pi/2]]) # [vt, wt]
+    u = np.array([[3, np.pi/4]]) # [vt, wt]
     
-    z = np.array([[11, 0.78],
-                [5, -0.78],
-                [5.6, -2.7],
-                [2, -5]], dtype=object) # [[rti, phiti, sti], ...]
+    z = np.array([[11, 0.78]], dtype=object) # [[rti, phiti, sti], ...]
 
-    for t in range(4):
+    for t in range(1):
         ut = u[t]
         zt = z[t]
         μt_1, Σt_1, pzt = mrl1.UKF_localization(μt_1, Σt_1, ut, zt, alpha, sigma)        
@@ -286,7 +280,7 @@ def UKF_localization_test():
     ax.plot(x_estimated, y_estimated, 'go', label='Estimated trajectory')
     ax.legend(bbox_to_anchor=(1.01, 1), loc='upper left')
     ax.grid()
-    plt.show()
+    plt.savefig('images/UKF_localization_test.png')
 
 
 def test_g():
@@ -296,8 +290,8 @@ def test_h():
     pass
 
 if __name__ == '__main__':
-    #EKF_localization_known_correspondences_test()
-    #EKF_localization_test()
+    EKF_localization_known_correspondences_test()
+    EKF_localization_test()
     UKF_localization_test()
     #test_g()
     #test_h()
