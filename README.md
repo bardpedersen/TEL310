@@ -58,7 +58,7 @@ This code is not complete!!
 ![EKF_localization](Assignment_3/images/EKF_localization_test.png)
 
 ### EKF_localization_know_correspondence:
-![EKF_localization_know_correspondence](Assignment_3/images/EKF_localization_know_correspondences_test.png)
+![EKF_localization_know_correspondence](Assignment_3/images/EKF_localization_known_correspondences_test.png)
 
 ### UKF_localization:
 ![UKF_localization](Assignment_3/images/UKF_localization_test.png)
@@ -75,4 +75,4 @@ This code is not complete!!
 ![Augmented_MCL_localization](Assignment_4/images/animation_Augmented_MCL.gif)
 
 ### KDL_sampling_MCL:
-![KDL_sampling_MCL](Assignment_4/images/animation_KDL_sampling_MCL2.gif)
+![KDL_sampling_MCL](Assignment_4/images/animation_KLD_Sampling_MCL2.gif)
