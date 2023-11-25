@@ -2,28 +2,45 @@
 import numpy as np
 
 
-def EKF_SLAM_known_correspondences(μt_1, Σt_1, ut, zt, ct, sigma):
+def EKF_SLAM_known_correspondences(μt_1, Σt_1, ut, zt, ct, number_of_landmarks, sigma):
+    """
+    Algorithm for calculating the EKF SLAM with known correspondences.
+
+    μt_1 = [xt_1, yt_1, θt_1] is the mean of the robot pose at time t-1
+    Σt_1 is the covariance of the robot pose at time t-1 (3x3)
+    ut = [vt, wt] is the control input
+    zt = {zt1,zt2,...} ranges to landmarks, where each zti = [rti, phiti, sti] is the range, bearing, and signature of the landmark
+    ct = {ct1,ct2,...} is the correspondence of each landmark
+    number_of_landmarks is the number of landmarks in the map
+    sigma = [sigma_r, sigma_phi, sigma_s] is the standard deviation of the measurements    
+
+    Returns:
+    μt is the mean of the robot pose at time t
+    Σt is the covariance of the robot pose at time t (3x3)
+    """
     x, y, theta = μt_1
     vt, wt = ut
     sigma_r, sigma_phi, sigma_s = sigma
-
-    dt = 0.1 #######
-    N = 1 #########
+    N = number_of_landmarks
+    dt = 1 # time step
+    Rt = np.diagflat(np.array([5.0, 5.0, 100.0])) ** 2
+    print(Rt)
 
     Fx = np.block([np.eye(3),np.zeros((3, 3*N))])
+
     μ_bar_t = μt_1 + Fx.T @ ([[-vt/wt*np.sin(theta) + vt/wt*np.sin(theta + wt*dt)],
                             [vt/wt*np.cos(theta) - vt/wt*np.cos(theta + wt*dt)],
-                            [wt*dt]])
+                            [wt*dt]]) # 3+3N x 1
 
-    Gt = np.eye(3) + Fx.T @ ([[0, 0, -vt/wt*np.cos(theta) + vt/wt*np.cos(theta + wt*dt)],
+    Gt = np.eye(3+3*N) + Fx.T @ ([[0, 0, -vt/wt*np.cos(theta) + vt/wt*np.cos(theta + wt*dt)],
                                 [0, 0, -vt/wt*np.sin(theta) + vt/wt*np.sin(theta + wt*dt)],
-                                [0, 0, 0]]) @ Fx
+                                [0, 0, 0]]) @ Fx # 3+3N x 3+3N
     
-    Σ_bar_t = Gt @ Σt_1 @ Gt.T + Fx.T @ Rt @ Fx
+    Σ_bar_t = Gt @ Σt_1 @ Gt.T + Fx.T @ Rt @ Fx 
 
     Qt = ([[sigma_r**2, 0, 0],
             [0, sigma_phi**2, 0],
-            [0, 0, sigma_s**2]])
+            [0, 0, sigma_s**2]]) # 3x3
 
     for i in range(zt):
         rit, phit, sit = zt[i]
@@ -50,12 +67,10 @@ def EKF_SLAM_known_correspondences(μt_1, Σt_1, ut, zt, ct, sigma):
                         [0, 0, 0, 0, 0, q]]) / q) @ Fxj
         
         Kit = Σ_bar_t @ Hit.T @ np.linalg.inv(Hit @ Σ_bar_t @ Hit.T + Qt)
-        μ_bar_t = μ_bar_t + Kit @ (zt[i] - z_hat_it)
-        Σ_bar_t = (np.eye(3+3*N) - Kit @ Hit) @ Σ_bar_t
+        μ_bar_t = μ_bar_t + Kit @ (zt[i] - z_hat_it) # 3x1
+        Σ_bar_t = (np.eye(3+3*N) - Kit @ Hit) @ Σ_bar_t # 3x3
 
-    μt = μ_bar_t
-    Σt = Σ_bar_t
-    return μt, Σt
+    return μ_bar_t, Σ_bar_t
 
 
 def EKF_SLAM(μt_1, Σt_1, ut, zt, Nt_1, sigma):
