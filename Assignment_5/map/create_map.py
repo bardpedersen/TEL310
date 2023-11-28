@@ -48,5 +48,5 @@ list_of_landmarks = [[y, x, z] for [x, y, z] in list_of_landmarks]  # Swap x and
 
 map_landmarks = add_landmarks(map, list_of_landmarks)         
 np.save('map_landmarks.npy', map_landmarks)
-plt.imshow(map_landmarks)
-plt.show()
+plt.imsave('map_landmarks.png', map_landmarks)
+plt.close()

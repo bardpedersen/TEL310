@@ -12,6 +12,7 @@ def EKF_SLAM_known_correspondences(μt_1, Σt_1, ut, zt, ct, number_of_landmarks
     zt = {zt1,zt2,...} ranges to landmarks, where each zti = [rti, phiti, sti] is the range, bearing, and signature of the landmark
     ct = {ct1,ct2,...} is the correspondence of each landmark
     number_of_landmarks is the number of landmarks in the map
+    μ_bar_j is the previus seen landmarks, where μ_bar_j = [xj, yj, sj] is the x, y and signature of the landmark pose
     sigma = [sigma_r, sigma_phi, sigma_s] is the standard deviation of the measurements    
 
     Returns:
@@ -71,7 +72,7 @@ def EKF_SLAM_known_correspondences(μt_1, Σt_1, ut, zt, ct, number_of_landmarks
 
         temp = np.dot(np.dot(Hit, Σ_bar_t), Hit.T) + Qt
         temp = np.array([[x[0] if isinstance(x, np.ndarray) and len(x) == 1 else x for x in row] for row in temp])
-        Kit = np.dot(np.dot(Σ_bar_t, Hit.T), np.linalg.inv(temp))
+        Kit = np.dot(np.dot(Σ_bar_t, Hit.T), np.linalg.inv(temp)) 
         μ_bar_t = np.reshape(μ_bar_t, (3 + 3 * N, 1))
         μ_bar_t = μ_bar_t + np.dot(Kit, (np.reshape([rit, phit, sit], (3, 1)) - z_hat_it))
         Σ_bar_t = np.dot((np.eye(3 + 3 * N) - np.dot(Kit, Hit)), Σ_bar_t)  # 3x3
@@ -81,13 +82,30 @@ def EKF_SLAM_known_correspondences(μt_1, Σt_1, ut, zt, ct, number_of_landmarks
 
 
 
-def EKF_SLAM(μt_1, Σt_1, ut, zt, Nt_1, Rt, sigma):
-    x, y, theta = μt_1
+def EKF_SLAM(μt_1, Σt_1, ut, zt, Nt_1, μ_bar_Nt1, sigma):
+    """
+    Algorithm for calculating the EKF SLAM with unknown correspondences.
+
+    μt_1 = [xt_1, yt_1, θt_1] is the mean of the robot pose at time t-1
+    Σt_1 is the covariance of the robot pose at time t-1 (3x3)
+    ut = [vt, wt] is the control input
+    zt = {zt1,zt2,...} ranges to landmarks, where each zti = [rti, phiti, sti] is the range, bearing, and signature of the landmark
+    Nt_1 is the number of landmarks at time t-1
+    μ_bar_Nt1 is the previus seen landmarks, where μ_bar_Nt1 = [xj, yj, sj] is the x, y and signature of the landmark pose
+    sigma = [sigma_r, sigma_phi, sigma_s] is the standard deviation of the measurements
+
+    Returns:
+    μt is the mean of the robot pose at time t
+    Σt is the covariance of the robot pose at time t (3x3)
+    Nt is the number of landmarks at time t
+    """
+
+    theta = μt_1[2]
     vt, wt = ut
     sigma_r, sigma_phi, sigma_s = sigma
-
-    dt = 1
     N = Nt_1
+    dt = 1
+    Rt = np.diagflat(np.array([5.0, 5.0, 100.0])) ** 2
 
     Fx = np.block([np.eye(3), np.zeros((3, 3 * N))])
 
@@ -107,43 +125,41 @@ def EKF_SLAM(μt_1, Σt_1, ut, zt, Nt_1, Rt, sigma):
                    [0, sigma_phi**2, 0],
                    [0, 0, sigma_s**2]], dtype=object)  # 3x3
     
-    for i in range(zt):
-        rit, phit, sit = zt[i]
-
-        μ_bar_Nt1 = ([[μ_bar_t[0] + rit*np.cos(phit + μ_bar_t[2])],
-            [μ_bar_t[1] + rit*np.sin(phit + μ_bar_t[2])],
-            [sit]])
+    for i, (rit, phit, sit) in enumerate(zt):
+        k = int((len(μ_bar_Nt1) - 3) / 3)
         
-        for k in Nt_1:
-            μ_bar_k = μ_bar_Nt1[k]
-            delta_k = np.array([[μ_bar_k[0] - μ_bar_t[0]],
-                            [μ_bar_k[1] - μ_bar_t[1]]])
+        μ_bar_Nt1[(sit + 1) * 3] = μ_bar_t[0] + rit * np.cos(phit + μ_bar_t[2])
+        μ_bar_Nt1[(sit + 1) * 3 + 1] = μ_bar_t[1] - rit * np.sin(phit + μ_bar_t[2])
+        μ_bar_Nt1[(sit + 1) * 3 + 2] = sit
+        
+        for j, value in enumerate(μ_bar_Nt1[2::3]):
+            delta_k = np.array([μ_bar_Nt1[j] - μ_bar_t[0], μ_bar_Nt1[j+1] - μ_bar_t[1]])
             
             q_k = delta_k.T @ delta_k
 
             z_hat_tk = np.array([[np.sqrt(q_k)],
                                 [np.arctan2(delta_k[1], delta_k[0]) - μ_bar_t[2]],
-                                [μ_bar_k[2]]])
+                                [μ_bar_Nt1[j+2]]])
             
-            Fxk = np.block([[np.eye(3), np.zeros((3, 3*k-3)), np.zeros(3, 3), np.zeros((3, 3*(N-k)))],
-                            [np.zeros((3, 3)), np.zeros((3, 3*k-3)), np.eye(3), np.zeros((3, 3*(N-k)))]])
+            Fxk = np.block([[np.eye(3), np.zeros((3, 3 * k - 3)), np.zeros((3, 3)), np.zeros((3, 3 * (N - k)))],
+                            [np.zeros((3, 3)), np.zeros((3, 3* k - 3)), np.eye(3), np.zeros((3, 3 * ( N - k)))]])
+            
             
             Htk = (np.array([[-np.sqrt(q_k)*delta_k[0], -np.sqrt(q_k)*delta_k[1], 0, np.sqrt(q_k)*delta_k[0], np.sqrt(q_k)*delta_k[1], 0],
                             [delta_k[1], -delta_k[0], -q_k, -delta_k[1], delta_k[0], 0],
                             [0, 0, 0, 0, 0, 1]]) / q_k) @ Fxk
 
             Ψ_k = Htk @ Σ_bar_t @ Htk.T + Qt
-            π_k = (zt[i] - z_hat_tk).T @ np.linalg.inv(Ψ_k) @ (zt[i] - z_hat_tk)
-            
-        π_Nt1 = alpha ######
+            Ψ_k = np.array([[x[0] if isinstance(x, np.ndarray) and len(x) == 1 else x for x in row] for row in Ψ_k])
+        π_k = (zt[i] - z_hat_tk).T @ np.linalg.inv(Ψ_k) @ (zt[i] - z_hat_tk)
 
-        j_i = np.argmin(π_k)
-        Nt = max(Nt, j_i)
+        Kit = Σ_bar_t @ Htk.T @ np.linalg.inv(Ψ_k)
+        μ_bar_t = μ_bar_t.reshape((3+3*N, 1))
+        zt[i] = np.array(zt[i]).reshape((3, 1))
+        μ_bar_t = μ_bar_t + Kit @ (zt[i] - z_hat_tk)
+        μ_bar_t = [[x[0] if isinstance(x, np.ndarray) and len(x) == 1 else x for x in row] for row in μ_bar_t]
+        μ_bar_t = np.array([x for sublist in μ_bar_t for x in sublist])
+        Σ_bar_t = (np.eye(3+3*N) - Kit @ Htk) @ Σ_bar_t
+        Σ_bar_t = np.array([[x[0] if isinstance(x, np.ndarray) and len(x) == 1 else x for x in row] for row in Σ_bar_t])
 
-        Kit = Σ_bar_t @ Htji.T @ np.linalg.inv(Ψ_k_ji)
-        μ_bar_t = μ_bar_t + Kit @ (zt[i] - z_hat_tji)
-        Σ_bar_t = (np.eye(3+3*N) - Kit @ Htji) @ Σ_bar_t
-        
-    μt = μ_bar_t
-    Σt = Σ_bar_t
-    return μt, Σt
+    return μ_bar_t, Σ_bar_t, μ_bar_Nt1
