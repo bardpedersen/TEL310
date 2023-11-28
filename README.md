@@ -80,7 +80,7 @@ This code is not complete!!
 ## Images from assignment 5:
 
 ### EKF Slam known correspondences:
-![EKF_Slam_known_correspondences](Assignment_5/images/EKF_Slam_known_correspondences.png)
+![EKF_Slam_known_correspondences](Assignment_5/images/EKF_SLAM_known_correspondences.png)
 
 ### EKF Slam:
-![EKF_Slam](Assignment_5/images/EKF_Slam.png)
+![EKF_Slam](Assignment_5/images/EKF_SLAM.png)
