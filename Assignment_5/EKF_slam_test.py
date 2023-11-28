@@ -15,7 +15,7 @@ def calculate_rti_phiti_sti(j_x, j_y, x, y, theta):
 
     return r_hat, theta_hat
 
-def plot_beams(xt, m, number_of_readings, z_maxlen, zt_start=np.pi/4, zt_end=-np.pi/4, transpose = True):
+def plot_beams(xt, m, number_of_readings, z_maxlen, zt_start=np.pi/8, zt_end=-np.pi/8, transpose = True):
     x_list = []
     y_list = []
     x_list_st = []
@@ -51,12 +51,27 @@ def plot_beams(xt, m, number_of_readings, z_maxlen, zt_start=np.pi/4, zt_end=-np
 
 def EKF_SLAM_known_correspondences_test():
     m = np.load('map/map_landmarks.npy')
-    μt_1 = np.array([25, 20, np.pi/2])
+    N = 31
+    μt_1 = np.array([25, 20, np.pi/2, 0, 0, 1, 5, 0, 2, 28, 0, 3, 36, 0, 4, 41, 0, 5, 83, 0, 6, 0, 4, 7, 83, 4, 8, 10, 8, 9, 15, 8, 10, 20, 8, 11, 25, 8, 12, 30, 8, 13, 35, 8, 14, 42, 8, 15, 48, 8, 16, 56, 8, 17, 0, 16, 18, 42, 18, 19, 6, 20, 20, 36, 22, 21, 48, 22, 22, 0, 24, 23, 12, 24, 24, 42, 26, 25, 83, 27, 26, 6, 28, 27, 83, 29, 28, 10, 31, 29, 24, 31, 30, 83, 31, 31])
+    μt_1 = μt_1.reshape((3+3*N, 1))
     μt_1_1 = μt_1.copy()
-    Σt_1 = np.eye(3) / 10
+    μ_bar_j = np.array([0]*(3+3*N))
+    Σt_1 = np.zeros((3+3*N, 3+3*N))
+    Σt_1[0, 0] = 1/3
+    Σt_1[1, 1] = 1/3
+    Σt_1[2, 2] = 1/3
     ut = np.array([[4, 1], [4, 1], [4, 0.1], [4, 0.1]])
-    zt = 0 ############################ [[[]],[]] [range, bearing, signature]
-    ct = 0 ############################ Know from map witch id
+    
+    zt = np.array([[[13.0, -3.5, 11], [12.0, -3.14, 12], [20.22, -3, 3],[13.0, -2.746, 13]],
+          [[27.73, -5.26, 7], [29.68, -5.143, 1], [25.61, -5.03, 2], [17.0, -5.22, 9], [12.80, -5.037, 10]],
+          [[21.74, -0.528, 18], [16.8, -0.8, 20], [23.90, -0.869, 23], [14, -1.24, 24], [21, -1.16, 27]],
+          [[12.81, -0.88, 20], [19.90, -0.97, 23], [10.39, -1.48, 24], [17.32, -1.34, 27]]], dtype=object)
+    
+    ct = np.array([[[20, 8, 11], [25, 8, 12], [28, 0, 3], [30, 8, 13]], 
+                [[0, 4, 7], [0, 0, 1], [5, 0, 2], [10, 8, 9] , [15, 8, 10]],
+                [[0, 16, 18],[6, 20, 20],[0, 24, 23], [12, 24, 24],[6, 28, 27]],
+                [[6, 20, 20],[0, 24, 23], [12, 24, 24],[6, 28, 27]]], dtype=object)
+    
     sigma = np.array([2, 0.1, 2])
 
     fig, ax = plt.subplots()
@@ -65,7 +80,7 @@ def EKF_SLAM_known_correspondences_test():
     plot_true = []
 
     for i, utt in enumerate(ut):
-        #μt_1, Σt_1 = EKF_slam.EKF_SLAM_known_correspondences(μt_1, Σt_1, utt, zt, ct, len(ct), sigma)
+        μt_1, Σt_1, μ_bar_j = EKF_slam.EKF_SLAM_known_correspondences(μt_1, Σt_1, utt, zt[i], ct[i], N, μ_bar_j, sigma)
         
         # For plotting the mean value
         plot_estimated.append([μt_1[0], μt_1[1]])
@@ -78,9 +93,9 @@ def EKF_SLAM_known_correspondences_test():
         plot_true.append([μt_1_1[0], μt_1_1[1]])
 
         # PLotting beams, to know which landmarks the robot sees
-        x_list, y_list, x_list_st, y_list_st = plot_beams(μt_1_1, m, 2, 100)
-        ax.plot(x_list, y_list, 'r.')
-        ax.plot(x_list_st, y_list_st, 'r.')
+        #x_list, y_list, x_list_st, y_list_st = plot_beams(μt_1_1, m, 2, 100)
+        #ax.plot(x_list, y_list, 'r.')
+        #ax.plot(x_list_st, y_list_st, 'r.')
 
         μt_1_1[0] = μt_1_1[0] + utt[0] * 1 * np.cos(μt_1_1[2])
         μt_1_1[1] = μt_1_1[1] + utt[0] * 1 * -np.sin(μt_1_1[2])
@@ -96,3 +111,27 @@ def EKF_SLAM_known_correspondences_test():
 
 if __name__ == '__main__':
     EKF_SLAM_known_correspondences_test()
+
+
+    """
+    landmarks_zt = [[[20, 8, 11], [25, 8, 12], [28, 0, 3], [30, 8, 13]], 
+                [[0, 4, 7], [0, 0, 1], [5, 0, 2], [10, 8, 9] , [15, 8, 10]],
+                [[0, 16, 18],[6, 20, 20],[0, 24, 23], [12, 24, 24],[6, 28, 27]],
+                [[6, 20, 20],[0, 24, 23], [12, 24, 24],[6, 28, 27]]]
+    
+    zt = [[[13.0, -3.5, 11], [12.0, -3.14, 12], [20.22, -3, 3],[13.0, -2.746, 13]],
+          [[27.73, -5.26, 7], [29.68, -5.143, 1], [25.61, -5.03, 2], [17.0, -5.22, 9], [12.80, -5.037, 10]],
+          [[21.74, -0.528, 18], [16.8, -0.8, 20], [23.90, -0.869, 23], [14, -1.24, 24], [21, -1.16, 27]],
+          [[12.81, -0.88, 20], [19.90, -0.97, 23], [10.39, -1.48, 24], [17.32, -1.34, 27]]]
+
+    μt_1 = np.array([25, 20, np.pi/2])
+    ut = np.array([[4, 1], [4, 1], [4, 0.1], [4, 0.1]])
+    for i, landmark in enumerate(landmarks_zt):
+        for j, landmark_2 in enumerate(landmark):
+            jx, jy, sti = landmark_2
+
+            print(calculate_rti_phiti_sti(jx, jy, μt_1[0], μt_1[1], μt_1[2]), sti)
+        μt_1[0] = μt_1[0] + ut[i][0] * 1 * np.cos(μt_1[2])
+        μt_1[1] = μt_1[1] + ut[i][0] * 1 * -np.sin(μt_1[2])
+        μt_1[2] = μt_1[2] + ut[i][1] * 1 
+    """

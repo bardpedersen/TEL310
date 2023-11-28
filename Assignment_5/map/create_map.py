@@ -25,27 +25,28 @@ def add_landmarks(map_array, list_of_landmarks):
 
     # Add the landmarks to the map
     for i, coordinate in enumerate(coordinates):
-        map_array[coordinate[0], coordinate[1]] = i+2
+        map_array[coordinate[0], coordinate[1]] = coordinate[2]
 
     return map_array
 
 map = generate_map(8*4,7*12, borders=False)
-np.save('map/map_1.npy', map)
+np.save('map_1.npy', map)
 
-list_of_landmarks = [[0, 0], [5, 0], [28, 0], [36, 0], [41, 0], [83, 0],
-                     [0, 4], [83, 4],
-                     [10, 8], [15, 8], [20, 8], [25, 8], [30, 8], [35, 8], [42, 8], [48, 8], [56, 8],
-                     [0, 16],
-                     [42, 18],
-                     [6,20], 
-                     [36,22], [48, 22],
-                     [0, 24], [12, 24],
-                     [42, 26], [83, 27],
-                     [6, 28], [83, 29],
-                     [10, 31], [24, 31], [83, 31]]
-list_of_landmarks = [[y, x] for [x, y] in list_of_landmarks] 
+list_of_landmarks = [[0, 0, 1], [5, 0, 2], [28, 0, 3], [36, 0, 4], [41, 0, 5], [83, 0, 6],
+                     [0, 4, 7], [83, 4, 8],
+                     [10, 8, 9] , [15, 8, 10], [20, 8, 11], [25, 8, 12], [30, 8, 13], [35, 8, 14], [42, 8, 15], [48, 8, 16], [56, 8, 17],
+                     [0, 16, 18],
+                     [42, 18, 19],
+                     [6, 20, 20], 
+                     [36, 22, 21], [48, 22, 22],
+                     [0, 24, 23], [12, 24, 24],
+                     [42, 26, 25], [83, 27, 26],
+                     [6, 28, 27], [83, 29, 28],
+                     [10, 31, 29], [24, 31, 30], [83, 31, 31]]
+
+list_of_landmarks = [[y, x, z] for [x, y, z] in list_of_landmarks]  # Swap x and y
 
 map_landmarks = add_landmarks(map, list_of_landmarks)         
-np.save('map/map_landmarks.npy', map_landmarks)
+np.save('map_landmarks.npy', map_landmarks)
 plt.imshow(map_landmarks)
 plt.show()
