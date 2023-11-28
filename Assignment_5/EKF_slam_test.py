@@ -156,8 +156,11 @@ def EKF_SLAM_test():
 
     x_estimated, y_estimated = zip(*plot_estimated)
     x_true, y_true = zip(*plot_true)
+    x_landmark = μ_bar_Nt1[3::3]
+    y_landmark = μ_bar_Nt1[4::3]
     ax.plot(x_true, y_true, 'b.', label='True trajectory')
     ax.plot(x_estimated, y_estimated, 'g.', label='Estimated trajectory')
+    ax.plot(x_landmark, y_landmark, 'r.', label='Estimated landmarks')
     ax.legend(bbox_to_anchor=(0.80, 1.30), loc='upper center')
     plt.savefig('images/EKF_SLAM.png')
 
@@ -166,7 +169,7 @@ if __name__ == '__main__':
     """
     See image EKF_SLAM_known_correspondences.png for the result of the EKF_SLAM_known_correspondences_test()
     """
-    EKF_SLAM_known_correspondences_test()
+    #EKF_SLAM_known_correspondences_test()
 
     """
     See image EKF_SLAM.png for the result of the EKF_SLAM_test()
